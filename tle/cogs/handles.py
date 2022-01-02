@@ -619,11 +619,13 @@ class Handles(commands.Cog):
         for user_id, score in sorted(res.items(), key=lambda item: item[1], reverse=True):
             member = ctx.guild.get_member(int(user_id))
             if not showall and member is None:
+                self.logger.info(f'Skipped {user_id} because member for user_id is not available')
                 continue
             if score > 0:
                 handle = cf_common.user_db.get_handle(user_id, ctx.guild.id)
                 user = cf_common.user_db.fetch_cf_user(handle)
                 if user is None:
+                    self.logger.info(f'Skipped {user_id} since CF User is not available')
                     continue
                 rating = user.rating
                 
@@ -637,14 +639,18 @@ class Handles(commands.Cog):
                 rating_changes = [change for change in rating_changes if change.ratingUpdateTimeSeconds < start_time]
                 rating_changes.sort(key=lambda a: a.ratingUpdateTimeSeconds)
                 if len(rating_changes) < 1: 
+                    self.logger.info(f'Skipped {user_id} since it has less than 1 contest')
                     continue
                 if rating_changes[-1] is None: continue
                 if division is not None:
                     if rating_changes[-1].newRating < _DIVISION_RATING_LOW[division-1] or rating_changes[-1].newRating > _DIVISION_RATING_HIGH[division-1]:
+                        self.logger.info(f'Skipped {user_id} since rating is not within division rating range')
                         continue
                 rating = rating_changes[-1].newRating
                 rankings.append((index, discord_handle, handle, rating, score))
                 index += 1
+            else:
+                self.logger.info(f'Skipped {user_id} because of no positive score')
             if index == 20:
                 break
 
