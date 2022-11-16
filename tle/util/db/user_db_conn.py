@@ -1210,6 +1210,20 @@ class UserDbConn:
         Round = namedtuple('Round', 'guild users rating points time problems status duration repeat times')
         return Round(data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10])
 
+    def check_if_user_in_ongoing_round(self, guild, user):
+        query = f'''
+                    SELECT * FROM ongoing_rounds
+                    WHERE
+                    users LIKE ? AND guild = ?
+                '''
+        cur = self.conn.cursor()
+        cur.execute(query, (f"%{user}%", guild))
+        data = cur.fetchall()
+        cur.close()
+        if len(data) > 0:
+            return True
+        return False
+
     def close(self):
         self.conn.close()
 

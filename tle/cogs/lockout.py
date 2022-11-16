@@ -29,16 +29,6 @@ MAX_PROBLEMS = 6
 MAX_ALTS = 5
 ROUNDS_PER_PAGE = 5
 
-def _get_ongoing_round_participants():
-    """ Returns a set containing the `member_id`s of users who are registered in an ongoing round.
-    """
-    ongoing_round_ids = cf_common.user_db.get_ongoing_round_ids()
-    ongoing_round_participants = set()
-    for round_id in ongoing_round_ids:
-        round_participants = set(cf_common.user_db.get_round_user_ids(round_id))
-        ongoing_round_participants |= round_participants
-    return ongoing_round_participants
-
 def _calc_round_score(users, status, times):
     def comp(a, b):
         if a[0] > b[0]:
@@ -101,12 +91,13 @@ class Round(commands.Cog):
             raise RoundCogError(f'Unable to start round, some participant(s) did not react in time!')
 
     def _check_if_any_member_is_already_in_round(self, ctx, members):
-        ongoing_round_member_ids = _get_ongoing_round_participants()
-        this_round_member_ids = {str(member.id) for member in members}
-        intersection = this_round_member_ids & ongoing_round_member_ids
-        if intersection:
-            busy_members = ", ".join([ctx.guild.get_member(int(member_id)).mention for member_id in intersection])
-            error = f'{busy_members} are registered in ongoing lockout rounds.'
+        busy_members = []
+        for member in members:
+            if cf_common.user_db.check_if_user_in_ongoing_round(ctx.guild.id, member.id):
+                busy_members.append(member)
+        if busy_members:
+            busy_members_str = ", ".join([ctx.guild.get_member(int(member_id)).mention for member_id in busy_members])
+            error = f'{busy_members_str} are registered in ongoing lockout rounds.'
             raise RoundCogError(error)
 
     async def _get_time_response(self, client, ctx, message, time, author, range_):
