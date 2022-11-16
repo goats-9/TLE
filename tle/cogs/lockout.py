@@ -224,7 +224,7 @@ class Round(commands.Cog):
         if len(members) > MAX_ROUND_USERS:
             raise RoundCogError(f'{ctx.author.mention} atmost {MAX_ROUND_USERS} users can compete at a time') 
 
-        self._check_if_all_members_ready(ctx, members)           
+        await self._check_if_all_members_ready(ctx, members)           
 
         problem_cnt = await self._get_time_response(self.client, ctx, f"{ctx.author.mention} enter the number of problems between [1, {MAX_PROBLEMS}]", 30, ctx.author, [1, MAX_PROBLEMS])
 
