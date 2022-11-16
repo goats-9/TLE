@@ -177,15 +177,15 @@ class Round(commands.Cog):
         return embed
     
     def make_round_embed(self, ctx):
-        desc = "Information about Matches related commands! **[use .round <command>]**\n\n"
+        desc = "Information about Round related commands! **[use ;round <command>]**\n\n"
         match = self.client.get_command('round')
 
         for cmd in match.commands:
             desc += f"`{cmd.name}`: **{cmd.brief}**\n"
         embed = discord.Embed(description=desc, color=discord.Color.dark_magenta())
-        embed.set_author(name="Lockout commands help", icon_url=ctx.me.avatar_url)
+        embed.set_author(name="Lockout commands help", icon_url=ctx.me.avatar)
         embed.set_footer(
-            text="Use the prefix . before each command. For detailed usage about a particular command, type .help match <command>")
+            text="Use the prefix ; before each command. For detailed usage about a particular command, type ;help round <command>")
         embed.add_field(name="GitHub repository", value=f"[GitHub](https://github.com/pseudocoder10/Lockout-Bot)",
                         inline=True)
         embed.add_field(name="Bot Invite link",
@@ -628,6 +628,10 @@ class Round(commands.Cog):
 
 #         await ctx.send(embed=discord_.round_problems_embed(round_info))
 
+    @discord_common.send_error_if(RoundCogError, cf_common.ResolveHandleError,
+                                  cf_common.FilterError)
+    async def cog_command_error(self, ctx, error):
+        pass
 
 async def setup(bot):
     await bot.add_cog(Round(bot))
