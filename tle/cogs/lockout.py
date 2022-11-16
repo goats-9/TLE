@@ -264,7 +264,7 @@ class Round(commands.Cog):
 
         await ctx.send(embed=discord.Embed(description="Starting the round...", color=discord.Color.green()))
 
-        cf_common.user_db.add_to_ongoing_round(ctx.guild.id, time.time(), members, rating, points, selected, duration, repeat)
+        cf_common.user_db.add_to_ongoing_round(ctx.guild.id, time.time(), members, ratings, points, selected, duration, repeat)
         round_info = cf_common.user_db.get_round_info(ctx.guild.id, members[0].id)
 
         await ctx.send(embed=self._round_problems_embed(round_info))
