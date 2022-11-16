@@ -20,7 +20,6 @@ from tle.util import codeforces_common as cf_common
 from tle.util import db
 from tle.util import codeforces_api as cf
 from tle.util import discord_common
-from utils.updation import round_score
 
 MAX_ROUND_USERS = 5
 LOWER_RATING = 800
