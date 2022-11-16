@@ -96,7 +96,7 @@ class Round(commands.Cog):
             if cf_common.user_db.check_if_user_in_ongoing_round(ctx.guild.id, member.id):
                 busy_members.append(member)
         if busy_members:
-            busy_members_str = ", ".join([ctx.guild.get_member(int(member_id)).mention for member_id in busy_members])
+            busy_members_str = ", ".join([ctx.guild.get_member(int(member.id)).mention for member in busy_members])
             error = f'{busy_members_str} are registered in ongoing lockout rounds.'
             raise RoundCogError(error)
 
