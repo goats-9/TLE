@@ -13,7 +13,7 @@ from discord.ext import commands
 from discord.ext.commands import cooldown, BucketType
 
 #from utils import cf_api, discord_, codeforces, updation, elo, tournament_helper, challonge_api
-from constants import AUTO_UPDATE_TIME, ADMIN_PRIVILEGE_ROLES
+#from constants import AUTO_UPDATE_TIME, ADMIN_PRIVILEGE_ROLES
 
 from tle import constants
 from tle.util import codeforces_common as cf_common
