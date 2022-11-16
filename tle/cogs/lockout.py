@@ -142,7 +142,7 @@ class Round(commands.Cog):
             await original.delete()
             raise RoundCogError(f'{ctx.author.mention} you took too long to decide')
 
-    def _round_problems_embed(round_info):
+    def _round_problems_embed(self, round_info):
         ranklist = _calc_round_score(list(map(int, round_info.users.split())), list(map(int, round_info.status.split())), list(map(int, round_info.times.split())))
 
         problems = round_info.problems.split()
