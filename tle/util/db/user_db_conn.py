@@ -1179,9 +1179,8 @@ class UserDbConn:
 
     def add_to_ongoing_round(self, guild_id, timestamp, users, rating, points, problems, duration, repeat):
         query = f'''
-            INSERT INTO lockout_ongoing_rounds
-            VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO lockout_ongoing_rounds (guild, users, rating, points, time, problems, status, duration, repeat, times)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
         cur = self.conn.cursor()
         cur.execute(query, (guild_id, ' '.join([f"{x.id}" for x in users]), 
