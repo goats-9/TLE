@@ -1188,7 +1188,7 @@ class UserDbConn:
                                       ' '.join(map(str, rating)),
                                       ' '.join(map(str, points)), 
                                       timestamp, 
-                                      ' '.join([f"{x.id}/{x.index}" for x in problems]), 
+                                      ' '.join([f"{x.contestId}/{x.index}" for x in problems]), 
                                       ' '.join('0' for i in range(len(users))),
                                       duration, 
                                       repeat, 
