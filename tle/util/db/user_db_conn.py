@@ -1179,7 +1179,7 @@ class UserDbConn:
 
     def add_to_ongoing_round(self, guild_id, timestamp, users, rating, points, problems, duration, repeat):
         query = f'''
-            INSERT INTO ongoing_rounds
+            INSERT INTO lockout_ongoing_rounds
             VALUES
             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
@@ -1199,7 +1199,7 @@ class UserDbConn:
 
     def get_round_info(self, guild_id, users):
         query = f'''
-                    SELECT * FROM ongoing_rounds
+                    SELECT * FROM lockout_ongoing_rounds
                     WHERE
                     guild = ? AND users LIKE ?
                  '''
@@ -1212,7 +1212,7 @@ class UserDbConn:
 
     def check_if_user_in_ongoing_round(self, guild, user):
         query = f'''
-                    SELECT * FROM ongoing_rounds
+                    SELECT * FROM lockout_ongoing_rounds
                     WHERE
                     users LIKE ? AND guild = ?
                 '''
