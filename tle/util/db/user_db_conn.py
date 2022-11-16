@@ -46,7 +46,7 @@ class DuelType(IntEnum):
     OFFICIAL = 1
     ADJUNOFFICIAL = 2
     ADJOFFICIAL = 3
-    
+
 class RatedVC(IntEnum):
     ONGOING = 0
     FINISHED = 1
@@ -141,7 +141,7 @@ class UserDbConn:
                 guild_id TEXT PRIMARY KEY,
                 channel_id TEXT
             )
-        ''')        
+        ''')
         self.conn.execute('''
             CREATE TABLE IF NOT EXISTS "challenge" (
                 "id"	INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -266,6 +266,29 @@ class UserDbConn:
             )
         ''')
 
+        self.conn.execute('''
+            CREATE TABLE IF NOT EXISTS round_settings (
+                guild_id TEXT PRIMARY KEY,
+                channel_id TEXT
+            )
+        ''')
+
+        self.conn.execute('''
+            CREATE TABLE IF NOT EXISTS lockout_ongoing_rounds (
+                "id"	INTEGER PRIMARY KEY AUTOINCREMENT,
+                "guild" TEXT,
+                "users" TEXT,
+                "rating" TEXT,
+                "points" TEXT,
+                "time" INT,
+                "problems" TEXT,
+                "status" TEXT,
+                "duration" INTEGER,
+                "repeat" INTEGER,
+                "times" TEXT
+            )
+        ''')
+
     # Helper functions.
 
     def _insert_one(self, table: str, columns, values: tuple):
@@ -348,12 +371,12 @@ class UserDbConn:
             SELECT user_id, rating_delta FROM challenge WHERE finish_time >= ? ORDER BY user_id
         '''
         return self.conn.execute(query, (timestamp,)).fetchall()
-        
+
     def get_gudgitters_timerange(self, timestampStart, timestampEnd):
         query = '''
             SELECT user_id, rating_delta FROM challenge WHERE finish_time >= ? AND finish_time <= ? ORDER BY user_id
         '''
-        return self.conn.execute(query, (timestampStart,timestampEnd)).fetchall()        
+        return self.conn.execute(query, (timestampStart,timestampEnd)).fetchall()
 
     def get_gudgitters(self):
         query = '''
@@ -702,7 +725,7 @@ class UserDbConn:
     def get_duel_wins(self, userid, guild_id):
         query = f'''
             SELECT start_time, finish_time, problem_name, challenger, challengee FROM duel
-            WHERE ((challenger = ? AND winner == {Winner.CHALLENGER}) OR (challengee = ? AND winner == {Winner.CHALLENGEE})) AND status = {Duel.COMPLETE} AND guild_id = ? 
+            WHERE ((challenger = ? AND winner == {Winner.CHALLENGER}) OR (challengee = ? AND winner == {Winner.CHALLENGEE})) AND status = {Duel.COMPLETE} AND guild_id = ?
         '''
         return self.conn.execute(query, (userid, userid, guild_id)).fetchall()
 
@@ -1060,8 +1083,8 @@ class UserDbConn:
             INSERT INTO training_problems (training_id, issue_time, problem_name, contest_id, p_index, rating, status)
             VALUES (?, ?, ?, ?, ?, ?, {TrainingProblemStatus.ACTIVE})
         '''
-        
-        cur = self.conn.cursor()            
+
+        cur = self.conn.cursor()
         cur.execute(query1, (training_id, issue_time, prob.name, prob.contestId, prob.index, prob.rating))
         if cur.rowcount != 1:
             self.conn.rollback()
@@ -1083,9 +1106,9 @@ class UserDbConn:
 
     def get_training_skips(self, user_id):
         query = f'''
-            SELECT tp.problem_name 
+            SELECT tp.problem_name
             FROM training_problems tp, trainings tr
-            WHERE tp.training_id = tr.id 
+            WHERE tp.training_id = tr.id
             AND (tp.status = {TrainingProblemStatus.SKIPPED} OR tp.status = {TrainingProblemStatus.INVALIDATED})
             AND tr.user_id = ?
         '''
@@ -1094,35 +1117,35 @@ class UserDbConn:
 
     def train_get_num_solves(self, training_id):
         query = f'''
-            SELECT COUNT(*) FROM training_problems 
+            SELECT COUNT(*) FROM training_problems
             WHERE training_id = ? AND status == {TrainingProblemStatus.SOLVED}
         '''
         return self.conn.execute(query, (training_id,)).fetchone()[0]
 
     def train_get_num_skips(self, training_id):
         query = f'''
-            SELECT COUNT(*) FROM training_problems 
+            SELECT COUNT(*) FROM training_problems
             WHERE training_id = ? AND status == {TrainingProblemStatus.SKIPPED}
         '''
         return self.conn.execute(query, (training_id,)).fetchone()[0]
 
     def train_get_num_slow_solves(self, training_id):
         query = f'''
-            SELECT COUNT(*) FROM training_problems 
+            SELECT COUNT(*) FROM training_problems
             WHERE training_id = ? AND status == {TrainingProblemStatus.SOLVED_TOO_SLOW}
         '''
         return self.conn.execute(query, (training_id,)).fetchone()[0]
 
     def train_get_start_rating(self, training_id):
         query = f'''
-            SELECT rating FROM training_problems 
+            SELECT rating FROM training_problems
             WHERE training_id = ?
         '''
         return self.conn.execute(query, (training_id,)).fetchone()[0]
 
     def train_get_max_rating(self, training_id):
         query = f'''
-            SELECT MAX(rating) FROM training_problems 
+            SELECT MAX(rating) FROM training_problems
             WHERE training_id = ? AND status == {TrainingProblemStatus.SOLVED}
         '''
         return self.conn.execute(query, (training_id,)).fetchone()[0]
@@ -1131,13 +1154,75 @@ class UserDbConn:
         query = f'''
             SELECT tr.user_id, tp.rating, min(tp.finish_time-tp.issue_time)
             FROM training_problems tp, trainings tr
-            WHERE tp.training_id = tr.id 
+            WHERE tp.training_id = tr.id
             AND (tp.status = {TrainingProblemStatus.SOLVED} OR tp.status = {TrainingProblemStatus.SOLVED_TOO_SLOW})
             GROUP BY tp.rating
         '''
         return self.conn.execute(query).fetchall()
 
+    ### Lockout round
+
+
+    def set_round_channel(self, guild_id, channel_id):
+        query = ('INSERT OR REPLACE INTO round_settings '
+                 ' (guild_id, channel_id) VALUES (?, ?)'
+                 )
+        with self.conn:
+            self.conn.execute(query, (guild_id, channel_id))
+
+    def get_round_channel(self, guild_id):
+        query = ('SELECT channel_id '
+                 'FROM round_settings '
+                 'WHERE guild_id = ?')
+        channel_id = self.conn.execute(query, (guild_id,)).fetchone()
+        return int(channel_id[0]) if channel_id else None
+
+    def add_to_ongoing_round(self, guild_id, timestamp, users, rating, points, problems, duration, repeat):
+        query = f'''
+            INSERT INTO ongoing_rounds
+            VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        '''
+        cur = self.conn.cursor()
+        cur.execute(query, (guild_id, ' '.join([f"{x.id}" for x in users]), 
+                                      ' '.join(map(str, rating)),
+                                      ' '.join(map(str, points)), 
+                                      timestamp, 
+                                      ' '.join([f"{x.id}/{x.index}" for x in problems]), 
+                                      ' '.join('0' for i in range(len(users))),
+                                      duration, 
+                                      repeat, 
+                                      ' '.join(['0'] * len(users)))
+                    )
+        self.conn.commit()
+        cur.close()
+
+    def get_round_info(self, guild_id, users):
+        query = f'''
+                    SELECT * FROM ongoing_rounds
+                    WHERE
+                    guild = ? AND users LIKE ?
+                 '''
+        cur = self.conn.cursor()
+        cur.execute(query, (guild_id, f"%{users}%"))
+        data = cur.fetchone()
+        cur.close()
+        Round = namedtuple('Round', 'guild users rating points time problems status duration repeat times')
+        return Round(data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10])
+
     def close(self):
         self.conn.close()
 
-
+            # CREATE TABLE IF NOT EXISTS lockout_ongoing_rounds (
+            #     "id"	INTEGER PRIMARY KEY AUTOINCREMENT,
+            #     "guild" TEXT,
+            #     "users" TEXT,
+            #     "rating" TEXT,
+            #     "points" TEXT,
+            #     "time" INT,
+            #     "problems" TEXT,
+            #     "status" TEXT,
+            #     "duration" INTEGER,
+            #     "repeat" INTEGER,
+            #     "times" TEXT
+            # )
