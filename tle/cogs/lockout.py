@@ -109,7 +109,7 @@ class Round(commands.Cog):
             error = f'{busy_members} are registered in ongoing lockout rounds.'
             raise RoundCogError(error)
 
-    async def _get_time_response(client, ctx, message, time, author, range_):
+    async def _get_time_response(self, client, ctx, message, time, author, range_):
         original = await ctx.send(embed=discord.Embed(description=message, color=discord.Color.green()))
 
         def check(m):
@@ -127,7 +127,7 @@ class Round(commands.Cog):
             await original.delete()
             raise RoundCogError(f'{ctx.author.mention} you took too long to decide')
 
-    async def _get_seq_response(client, ctx, message, time, length, author, range_):
+    async def _get_seq_response(self, client, ctx, message, time, length, author, range_):
         original = await ctx.send(embed=discord.Embed(description=message, color=discord.Color.green()))
 
         def check(m):
