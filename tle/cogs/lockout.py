@@ -68,13 +68,13 @@ class Round(commands.Cog):
         # self.cf = cf_api.CodeforcesAPI()
         # self.api = challonge_api.ChallongeAPI(self.client)
 
-    def _checkIfCorrectChannel(self, ctx):
+    def _check_if_correct_channel(self, ctx):
         lockout_channel_id = cf_common.user_db.get_round_channel(ctx.guild.id)
         channel = ctx.guild.get_channel(lockout_channel_id)
         if not lockout_channel_id or ctx.channel.id != lockout_channel_id:
             raise RoundCogError('You must use this command in lockout round channel ({channel.mention}).')
 
-    async def _checkIfAllMembersReady(self, ctx, members):
+    async def _check_if_all_members_ready(self, ctx, members):
         embed = discord.Embed(description=f"{' '.join(x.mention for x in members)} react on the message with ✅ within 30 seconds to join the round. {'Since you are the only participant, this will be a practice round and there will be no rating changes' if len(members) == 1 else ''}",
             color=discord.Color.purple())
         message = await ctx.send(embed=embed)
@@ -100,7 +100,7 @@ class Round(commands.Cog):
         if not all_reacted:
             raise RoundCogError(f'Unable to start round, some participant(s) did not react in time!')
 
-    def _checkIfNoMemberIsAlreadyInRound(self, ctx, members):
+    def _check_if_any_member_is_already_in_round(self, ctx, members):
         ongoing_round_member_ids = _get_ongoing_round_participants()
         this_round_member_ids = {str(member.id) for member in members}
         intersection = this_round_member_ids & ongoing_round_member_ids
@@ -223,7 +223,7 @@ class Round(commands.Cog):
     @round.command(name="challenge", brief="Challenge multiple users to a round")
     async def challenge(self, ctx, *members: discord.Member):
         # check if we are in the correct channel
-        self._checkIfCorrectChannel(ctx)
+        self._check_if_correct_channel(ctx)
         
         members = list(set(members))
         if len(members) == 0:
@@ -233,7 +233,7 @@ class Round(commands.Cog):
         if len(members) > MAX_ROUND_USERS:
             raise RoundCogError(f'{ctx.author.mention} atmost {MAX_ROUND_USERS} users can compete at a time') 
 
-        self._checkIfAllMembersReady(ctx, members)           
+        self._check_if_all_members_ready(ctx, members)           
 
         problem_cnt = await self._get_time_response(self.client, ctx, f"{ctx.author.mention} enter the number of problems between [1, {MAX_PROBLEMS}]", 30, ctx.author, [1, MAX_PROBLEMS])
 
@@ -246,7 +246,7 @@ class Round(commands.Cog):
         repeat = await self._get_time_response(self.client, ctx, f"{ctx.author.mention} do you want a new problem to appear when someone solves a problem (type 1 for yes and 0 for no)", 30, ctx.author, [0, 1])
 
         # check for members still in a round
-        self._checkIfNoMemberIsAlreadyInRound(self, ctx, members)
+        self._check_if_any_member_is_already_in_round(ctx, members)
 
         # pick problem
         handles = cf_common.members_to_handles(members, ctx.guild.id)
