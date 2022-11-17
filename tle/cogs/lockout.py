@@ -151,10 +151,10 @@ class Round(commands.Cog):
                     if prob.contestId == problemContestId and prob.index == problemIndex]
 
         problems = [get_problem(prob.split('/')[0], prob.split('/')[1]) if prob != '0' else None for prob in problemEntries]
-                       
-        names = [f'[{prob.name}](https://codeforces.com/contest/{prob.contestId]}' 
-                f'/problem/{prob.index})' if problemEntries[i] != '0' else 'This problem has been solved' if
-                round_info.repeat == 0 else 'No problems of this rating left' for i in range(len(problems))]
+
+        replacementStr = 'This problem has been solved' if round_info.repeat == 0 else 'No problems of this rating left'
+        names = [f'[{prob.name}](https://codeforces.com/contest/{prob.contestId}/problem/{prob.index})' 
+                    if problemEntries[i] != '0' else replacementStr for prob in problems]
 
         desc = ""
         for user in ranklist:
