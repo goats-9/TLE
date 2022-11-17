@@ -1225,7 +1225,7 @@ class UserDbConn:
 
     def delete_round(self, guild, user):
         query = f'''
-                    DELETE FROM ongoing_rounds
+                    DELETE FROM lockout_ongoing_rounds
                     WHERE
                     guild = ? AND users LIKE ?
                 '''

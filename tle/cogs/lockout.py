@@ -145,25 +145,31 @@ class Round(commands.Cog):
     def _round_problems_embed(self, round_info):
         ranklist = _calc_round_score(list(map(int, round_info.users.split())), list(map(int, round_info.status.split())), list(map(int, round_info.times.split())))
 
-        problems = round_info.problems.split()
-        names = [f"[@@@Problemname](https://codeforces.com/contest/{problems[i].split('/')[0]}" ## TODO: db call {db.get_problems(problems[i])[0].name}
-                f"/problem/{problems[i].split('/')[1]})" if problems[i] != '0' else "This problem has been solved" if
-                round_info.repeat == 0 else "No problems of this rating left" for i in range(len(problems))]
+        problemEntries = round_info.problems.split()
+        def get_problem(problemContestId, problemIndex):
+            return [prob for prob in cf_common.cache2.problem_cache.problems
+                    if prob.contestId == problemContestId and prob.index == problemIndex]
+
+        problems = [get_problem(prob.split('/')[0], prob.split('/')[1]) if prob != '0' else None for prob in problemEntries]
+                       
+        names = [f'[{prob.name}](https://codeforces.com/contest/{prob.contestId]}' 
+                f'/problem/{prob.index})' if problemEntries[i] != '0' else 'This problem has been solved' if
+                round_info.repeat == 0 else 'No problems of this rating left' for i in range(len(problems))]
 
         desc = ""
         for user in ranklist:
-            emojis = [":first_place:", ":second_place:", ":third_place:"]
-            handle = "Dummy"### TODO: db.get_handle(round_info.guild, user.id) 
-            desc += f"{emojis[user.rank-1] if user.rank <= len(emojis) else user.rank} [{handle}](https://codeforces.com/profile/{handle}) **{user.points}** points\n"
+            emojis = [':first_place:', ':second_place:', ':third_place:']
+            handle = cf_common.user_db.get_handle(user.id, round_info.guild) 
+            desc += f'{emojis[user.rank-1] if user.rank <= len(emojis) else user.rank} [{handle}](https://codeforces.com/profile/{handle}) **{user.points}** points\n'
 
         embed = discord.Embed(description=desc, color=discord.Color.magenta())
-        embed.set_author(name=f"Problems")
+        embed.set_author(name=f'Problems')
 
-        embed.add_field(name="Points", value='\n'.join(round_info.points.split()), inline=True)
-        embed.add_field(name="Problem Name", value='\n'.join(names), inline=True)
-        embed.add_field(name="Rating", value='\n'.join(round_info.rating.split()), inline=True)
+        embed.add_field(name='Points', value='\n'.join(round_info.points.split()), inline=True)
+        embed.add_field(name='Problem Name', value='\n'.join(names), inline=True)
+        embed.add_field(name='Rating', value='\n'.join(round_info.rating.split()), inline=True)
         timestr = cf_common.pretty_time_format(((round_info.time + 60 * round_info.duration) - int(time.time())), shorten=True, always_seconds=True)
-        embed.set_footer(text=f"Time left: {timestr}")
+        embed.set_footer(text=f'Time left: {timestr}')
 
         return embed
     
