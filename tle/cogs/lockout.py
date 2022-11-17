@@ -147,14 +147,14 @@ class Round(commands.Cog):
 
         problemEntries = round_info.problems.split()
         def get_problem(problemContestId, problemIndex):
-            return [prob for prob in cf_common.cache2.problem_cache.problems
-                    if prob.contestId == problemContestId and prob.index == problemIndex]
+            return [prob for prob in cf_common.cache2.problem_cache.problems if prob.contestId == problemContestId and prob.index == problemIndex ]
 
-        problems = [get_problem(prob.split('/')[0], prob.split('/')[1])[0] if prob != '0' else None for prob in problemEntries]
+        #getProblem gives a list. 
+        problems = [get_problem(prob.split('/')[0], prob.split('/')[1]) if prob != '0' else None for prob in problemEntries]
 
         replacementStr = 'This problem has been solved' if round_info.repeat == 0 else 'No problems of this rating left'
-        names = [f'[{prob.name}](https://codeforces.com/contest/{prob.contestId}/problem/{prob.index})' 
-                    if prob != '0' else replacementStr for prob in problems]
+        names = [f'[{prob[0].name}](https://codeforces.com/contest/{prob[0].contestId}/problem/{prob[0].index})' 
+                    if len(prob) > 0 and prob[0] != '0' else replacementStr for prob in problems]
 
         desc = ""
         for user in ranklist:
