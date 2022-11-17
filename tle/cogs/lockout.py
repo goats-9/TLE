@@ -264,160 +264,29 @@ class Round(commands.Cog):
 
         await ctx.send(embed=discord.Embed(description="Starting the round...", color=discord.Color.green()))
 
-        cf_common.user_db.add_to_ongoing_round(ctx.guild.id, time.time(), members, ratings, points, selected, duration, repeat)
+        cf_common.user_db.create_round(ctx.guild.id, time.time(), members, ratings, points, selected, duration, repeat)
         round_info = cf_common.user_db.get_round_info(ctx.guild.id, members[0].id)
 
         await ctx.send(embed=self._round_problems_embed(round_info))
 
-#     @round.command(name="ongoing", brief="View ongoing rounds")
-#     async def ongoing(self, ctx):
-#         data = self.db.get_all_rounds(ctx.guild.id)
+    @round.command(brief="Invalidate a round (Admin/Mod/Lockout Manager only)")
+    @commands.has_any_role(constants.TLE_ADMIN, constants.TLE_MODERATOR)  # OK
+    async def _invalidate(self, ctx, member: discord.Member):
+        if not cf_common.user_db.check_if_user_in_ongoing_round(ctx.guild.id, member.id):
+            raise RoundCogError(f'{member.mention} is not in a round')
+        cf_common.user_db.delete_round(ctx.guild.id, member.id)
+        await ctx.send(f'Round deleted.')
 
-#         content = discord_.ongoing_rounds_embed(data)
+    @round.command(brief="View problems of a round")
+    async def problems(self, ctx, member: discord.Member=None):
+        if not member:
+            member = ctx.author
+        if not cf_common.user_db.check_if_user_in_ongoing_round(ctx.guild.id, member.id):
+            raise RoundCogError(f'{member.mention} is not in a round')
 
-#         if len(content) == 0:
-#             await discord_.send_message(ctx, f"No ongoing rounds")
-#             return
+        round_info = cf_common.user_db.get_round_info(ctx.guild.id, member.id)
+        await ctx.send(embed=self._round_problems_embed(round_info))
 
-#         currPage = 0
-#         totPage = math.ceil(len(content) / ROUNDS_PER_PAGE)
-#         text = '\n'.join(content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-#         embed = discord.Embed(description=text, color=discord.Color.blurple())
-#         embed.set_author(name="Ongoing Rounds")
-#         embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
-#         message = await ctx.send(embed=embed)
-
-#         await message.add_reaction("⏮")
-#         await message.add_reaction("◀")
-#         await message.add_reaction("▶")
-#         await message.add_reaction("⏭")
-
-#         def check(reaction, user):
-#             return reaction.message.id == message.id and reaction.emoji in ["⏮", "◀", "▶",
-#                                                                             "⏭"] and user != self.client.user
-
-#         while True:
-#             try:
-#                 reaction, user = await self.client.wait_for('reaction_add', timeout=90, check=check)
-#                 try:
-#                     await reaction.remove(user)
-#                 except Exception:
-#                     pass
-#                 if reaction.emoji == "⏮":
-#                     currPage = 0
-#                 elif reaction.emoji == "◀":
-#                     currPage = max(currPage - 1, 0)
-#                 elif reaction.emoji == "▶":
-#                     currPage = min(currPage + 1, totPage - 1)
-#                 else:
-#                     currPage = totPage - 1
-#                 text = '\n'.join(
-#                     content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-#                 embed = discord.Embed(description=text, color=discord.Color.blurple())
-#                 embed.set_author(name="Ongoing rounds")
-#                 embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
-#                 await message.edit(embed=embed)
-
-#             except asyncio.TimeoutError:
-#                 break
-
-#     @round.command(brief="Invalidate a round (Admin/Mod/Lockout Manager only)")
-#     async def _invalidate(self, ctx, member: discord.Member):
-#         if not discord_.has_admin_privilege(ctx):
-#             await discord_.send_message(ctx, f"{ctx.author.mention} you require 'manage server' permission or one of the "
-#                                     f"following roles: {', '.join(ADMIN_PRIVILEGE_ROLES)} to use this command")
-#             return
-#         if not self.db.in_a_round(ctx.guild.id, member.id):
-#             await discord_.send_message(ctx, f"{member.mention} is not in a round")
-#             return
-#         self.db.delete_round(ctx.guild.id, member.id)
-#         await discord_.send_message(ctx, f"Round deleted")
-
-#     @round.command(name="recent", brief="Show recent rounds")
-#     async def recent(self, ctx, user: discord.Member=None):
-#         data = self.db.get_recent_rounds(ctx.guild.id, str(user.id) if user else None)
-
-#         content = discord_.recent_rounds_embed(data)
-
-#         if len(content) == 0:
-#             await discord_.send_message(ctx, f"No recent rounds")
-#             return
-
-#         currPage = 0
-#         totPage = math.ceil(len(content) / ROUNDS_PER_PAGE)
-#         text = '\n'.join(content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-#         embed = discord.Embed(description=text, color=discord.Color.blurple())
-#         embed.set_author(name="Recent Rounds")
-#         embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
-#         message = await ctx.send(embed=embed)
-
-#         await message.add_reaction("⏮")
-#         await message.add_reaction("◀")
-#         await message.add_reaction("▶")
-#         await message.add_reaction("⏭")
-
-#         def check(reaction, user):
-#             return reaction.message.id == message.id and reaction.emoji in ["⏮", "◀", "▶",
-#                                                                             "⏭"] and user != self.client.user
-
-#         while True:
-#             try:
-#                 reaction, user = await self.client.wait_for('reaction_add', timeout=90, check=check)
-#                 try:
-#                     await reaction.remove(user)
-#                 except Exception:
-#                     pass
-#                 if reaction.emoji == "⏮":
-#                     currPage = 0
-#                 elif reaction.emoji == "◀":
-#                     currPage = max(currPage - 1, 0)
-#                 elif reaction.emoji == "▶":
-#                     currPage = min(currPage + 1, totPage - 1)
-#                 else:
-#                     currPage = totPage - 1
-#                 text = '\n'.join(
-#                     content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-#                 embed = discord.Embed(description=text, color=discord.Color.blurple())
-#                 embed.set_author(name="Recent rounds")
-#                 embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
-#                 await message.edit(embed=embed)
-
-#             except asyncio.TimeoutError:
-#                 break
-
-# #     @round.command(name="invalidate", brief="Invalidate your round")
-# #     async def invalidate(self, ctx):
-# #         if not self.db.in_a_round(ctx.guild.id, ctx.author.id):
-# #             await ctx.send(f"{ctx.author.mention} you are not in a round")
-# #             return
-# #
-# #         data = self.db.get_round_info(ctx.guild.id, ctx.author.id)
-# #         try:
-# #             users = [await ctx.guild.fetch_member(int(x)) for x in data[1].split()]
-# #         except Exception:
-# #             await ctx.send(f"{ctx.author.mention} some error occurred! Maybe one of the participants left the server")
-# #             return
-# #
-# #         msg = await ctx.send(f"{' '.join([x.mention for x in users])} react within 30 seconds to invalidate the match")
-# #         await msg.add_reaction("✅")
-# #
-# #         await asyncio.sleep(30)
-# #         message = await ctx.channel.fetch_message(msg.id)
-# #
-# #         reaction = None
-# #         for x in message.reactions:
-# #             if x.emoji == "✅":
-# #                 reaction = x
-# #
-# #         reacted = await reaction.users().flatten()
-# #         for i in users:
-# #             if i not in reacted:
-# #                 await ctx.send(f"Unable to invalidate round, {i.name} did not react in time!")
-# #                 return
-# #
-# #         self.db.delete_round(ctx.guild.id, ctx.author.id)
-# #         await ctx.send(f"Match has been invalidated")
-# #
 #     @round.command(brief="Update matches status for the server")
 #     @cooldown(1, AUTO_UPDATE_TIME, BucketType.guild)
 #     async def update(self, ctx):
@@ -509,16 +378,149 @@ class Round(commands.Cog):
 #                 logging_channel = await self.client.fetch_channel(os.environ.get("LOGGING_CHANNEL"))
 #                 await logging_channel.send(f"Error while updating rounds: {str(traceback.format_exc())}")
 
-#     @round.command(name="problems", brief="View problems of a round")
-#     async def problems(self, ctx, member: discord.Member=None):
-#         if not member:
-#             member = ctx.author
-#         if not self.db.in_a_round(ctx.guild.id, member.id):
-#             await discord_.send_message(ctx, f"{member.mention} is not in a round")
+
+
+#     @round.command(name="ongoing", brief="View ongoing rounds")
+#     async def ongoing(self, ctx):
+#         data = self.db.get_all_rounds(ctx.guild.id)
+
+#         content = discord_.ongoing_rounds_embed(data)
+
+#         if len(content) == 0:
+#             await discord_.send_message(ctx, f"No ongoing rounds")
 #             return
 
-#         round_info = self.db.get_round_info(ctx.guild.id, member.id)
-#         await ctx.send(embed=discord_.round_problems_embed(round_info))
+#         currPage = 0
+#         totPage = math.ceil(len(content) / ROUNDS_PER_PAGE)
+#         text = '\n'.join(content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
+#         embed = discord.Embed(description=text, color=discord.Color.blurple())
+#         embed.set_author(name="Ongoing Rounds")
+#         embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
+#         message = await ctx.send(embed=embed)
+
+#         await message.add_reaction("⏮")
+#         await message.add_reaction("◀")
+#         await message.add_reaction("▶")
+#         await message.add_reaction("⏭")
+
+#         def check(reaction, user):
+#             return reaction.message.id == message.id and reaction.emoji in ["⏮", "◀", "▶",
+#                                                                             "⏭"] and user != self.client.user
+
+#         while True:
+#             try:
+#                 reaction, user = await self.client.wait_for('reaction_add', timeout=90, check=check)
+#                 try:
+#                     await reaction.remove(user)
+#                 except Exception:
+#                     pass
+#                 if reaction.emoji == "⏮":
+#                     currPage = 0
+#                 elif reaction.emoji == "◀":
+#                     currPage = max(currPage - 1, 0)
+#                 elif reaction.emoji == "▶":
+#                     currPage = min(currPage + 1, totPage - 1)
+#                 else:
+#                     currPage = totPage - 1
+#                 text = '\n'.join(
+#                     content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
+#                 embed = discord.Embed(description=text, color=discord.Color.blurple())
+#                 embed.set_author(name="Ongoing rounds")
+#                 embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
+#                 await message.edit(embed=embed)
+
+#             except asyncio.TimeoutError:
+#                 break
+
+
+
+#     @round.command(name="recent", brief="Show recent rounds")
+#     async def recent(self, ctx, user: discord.Member=None):
+#         data = self.db.get_recent_rounds(ctx.guild.id, str(user.id) if user else None)
+
+#         content = discord_.recent_rounds_embed(data)
+
+#         if len(content) == 0:
+#             await discord_.send_message(ctx, f"No recent rounds")
+#             return
+
+#         currPage = 0
+#         totPage = math.ceil(len(content) / ROUNDS_PER_PAGE)
+#         text = '\n'.join(content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
+#         embed = discord.Embed(description=text, color=discord.Color.blurple())
+#         embed.set_author(name="Recent Rounds")
+#         embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
+#         message = await ctx.send(embed=embed)
+
+#         await message.add_reaction("⏮")
+#         await message.add_reaction("◀")
+#         await message.add_reaction("▶")
+#         await message.add_reaction("⏭")
+
+#         def check(reaction, user):
+#             return reaction.message.id == message.id and reaction.emoji in ["⏮", "◀", "▶",
+#                                                                             "⏭"] and user != self.client.user
+
+#         while True:
+#             try:
+#                 reaction, user = await self.client.wait_for('reaction_add', timeout=90, check=check)
+#                 try:
+#                     await reaction.remove(user)
+#                 except Exception:
+#                     pass
+#                 if reaction.emoji == "⏮":
+#                     currPage = 0
+#                 elif reaction.emoji == "◀":
+#                     currPage = max(currPage - 1, 0)
+#                 elif reaction.emoji == "▶":
+#                     currPage = min(currPage + 1, totPage - 1)
+#                 else:
+#                     currPage = totPage - 1
+#                 text = '\n'.join(
+#                     content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
+#                 embed = discord.Embed(description=text, color=discord.Color.blurple())
+#                 embed.set_author(name="Recent rounds")
+#                 embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
+#                 await message.edit(embed=embed)
+
+#             except asyncio.TimeoutError:
+#                 break
+
+# #     @round.command(name="invalidate", brief="Invalidate your round")
+# #     async def invalidate(self, ctx):
+# #         if not self.db.in_a_round(ctx.guild.id, ctx.author.id):
+# #             await ctx.send(f"{ctx.author.mention} you are not in a round")
+# #             return
+# #
+# #         data = self.db.get_round_info(ctx.guild.id, ctx.author.id)
+# #         try:
+# #             users = [await ctx.guild.fetch_member(int(x)) for x in data[1].split()]
+# #         except Exception:
+# #             await ctx.send(f"{ctx.author.mention} some error occurred! Maybe one of the participants left the server")
+# #             return
+# #
+# #         msg = await ctx.send(f"{' '.join([x.mention for x in users])} react within 30 seconds to invalidate the match")
+# #         await msg.add_reaction("✅")
+# #
+# #         await asyncio.sleep(30)
+# #         message = await ctx.channel.fetch_message(msg.id)
+# #
+# #         reaction = None
+# #         for x in message.reactions:
+# #             if x.emoji == "✅":
+# #                 reaction = x
+# #
+# #         reacted = await reaction.users().flatten()
+# #         for i in users:
+# #             if i not in reacted:
+# #                 await ctx.send(f"Unable to invalidate round, {i.name} did not react in time!")
+# #                 return
+# #
+# #         self.db.delete_round(ctx.guild.id, ctx.author.id)
+# #         await ctx.send(f"Match has been invalidated")
+# #
+
+
 
 #     @round.command(name="custom", brief="Challenge to a round with custom problemset")
 #     async def custom(self, ctx, *users: discord.Member):

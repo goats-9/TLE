@@ -272,7 +272,7 @@ class UserDbConn:
                 channel_id TEXT
             )
         ''')
-
+        self.conn.execute('''DROP TABLE lockout_ongoing_rounds''')
         self.conn.execute('''
             CREATE TABLE IF NOT EXISTS lockout_ongoing_rounds (
                 "id"	INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1177,7 +1177,7 @@ class UserDbConn:
         channel_id = self.conn.execute(query, (guild_id,)).fetchone()
         return int(channel_id[0]) if channel_id else None
 
-    def add_to_ongoing_round(self, guild_id, timestamp, users, rating, points, problems, duration, repeat):
+    def create_round(self, guild_id, timestamp, users, rating, points, problems, duration, repeat):
         query = f'''
             INSERT INTO lockout_ongoing_rounds (guild, users, rating, points, time, problems, status, duration, repeat, times)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1222,6 +1222,17 @@ class UserDbConn:
         if len(data) > 0:
             return True
         return False
+
+    def delete_round(self, guild, user):
+        query = f'''
+                    DELETE FROM ongoing_rounds
+                    WHERE
+                    guild = ? AND users LIKE ?
+                '''
+        cur = self.conn.cursor()
+        cur.execute(query, (guild, f"%{user}%"))
+        self.conn.commit()
+        cur.close()        
 
     def close(self):
         self.conn.close()
