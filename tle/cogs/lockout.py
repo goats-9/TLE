@@ -147,9 +147,9 @@ class Round(commands.Cog):
 
         problemEntries = round_info.problems.split()
         def get_problem(problemContestId, problemIndex):
-            return [prob for prob in cf_common.cache2.problem_cache.problems if prob.contestId == problemContestId and prob.index == problemIndex ]
+            return [prob for prob in cf_common.cache2.problem_cache.problems if prob.contest_identifier == f'{problemContestId}{problemIndex}' ]
 
-        #getProblem gives a list. 
+        #getProblem gives a list. Something is wrong here since it does not work
         problems = [get_problem(prob.split('/')[0], prob.split('/')[1]) if prob != '0' else None for prob in problemEntries]
 
         replacementStr = 'This problem has been solved' if round_info.repeat == 0 else 'No problems of this rating left'
