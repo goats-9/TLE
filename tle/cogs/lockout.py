@@ -368,7 +368,7 @@ class Round(commands.Cog):
                 updates.append([])
                 continue
 
-            times = [self._get_solve_time(handle, int(problems[i].split('/')[0]), problems[i].split('/')[1]) for handle in handles]
+            times = [await self._get_solve_time(handle, int(problems[i].split('/')[0]), problems[i].split('/')[1]) for handle in handles]
 
             # There are pending submission that need to be judged -> skip this problem for now
             if any([substatus == PROBLEM_STATUS_TESTING for substatus in times]):
