@@ -1288,7 +1288,7 @@ class UserDbConn:
         cur.execute(query, (guild,))
         res = cur.fetchall()
         cur.close()
-        Round = namedtuple('Round', 'guild users rating points time channel problems status duration repeat times, tournament')
+        Round = namedtuple('Round', 'guild users rating points time problems status duration repeat times')
         return [Round(data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10]) for data in res]
 
     def close(self):
