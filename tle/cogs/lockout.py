@@ -1,10 +1,8 @@
 import random
 import discord
 import asyncio
-import os
-import math
-import traceback
 import time
+import logging
 
 from functools import cmp_to_key
 from collections import namedtuple
@@ -20,14 +18,22 @@ from tle.util import codeforces_common as cf_common
 from tle.util import db
 from tle.util import codeforces_api as cf
 from tle.util import discord_common
+from tle.util import elo
+
+logger = logging.getLogger(__name__)
 
 MAX_ROUND_USERS = 5
 LOWER_RATING = 800
-UPPER_RATING = 3600
+UPPER_RATING = 3500
 MATCH_DURATION = [5, 180]
 MAX_PROBLEMS = 6
 MAX_ALTS = 5
 ROUNDS_PER_PAGE = 5
+AUTO_UPDATE_TIME = 30
+RECENT_SUBS_LIMIT = 50
+PROBLEM_STATUS_UNSOLVED = 0
+PROBLEM_STATUS_TESTING = -1
+
 
 def _calc_round_score(users, status, times):
     def comp(a, b):
@@ -53,10 +59,21 @@ class RoundCogError(commands.CommandError):
     pass
 
 class Round(commands.Cog):
-    def __init__(self, client):
-        self.client = client
+    def __init__(self, bot):
+        self.bot = bot
         # self.cf = cf_api.CodeforcesAPI()
         # self.api = challonge_api.ChallongeAPI(self.client)
+
+    @commands.Cog.listener()
+    @discord_common.once
+    async def on_ready(self):
+        asyncio.create_task(self._check_ongoing_rounds())
+
+    async def _check_ongoing_rounds(self):
+        for guild in self.bot.guilds:
+            await self._check_ongoing_rounds_for_guild(guild)    
+        await asyncio.sleep(AUTO_UPDATE_TIME)
+        asyncio.create_task(self._check_ongoing_rounds()) 
 
     def _check_if_correct_channel(self, ctx):
         lockout_channel_id = cf_common.user_db.get_round_channel(ctx.guild.id)
@@ -149,7 +166,6 @@ class Round(commands.Cog):
         def get_problem(problemContestId, problemIndex):
             return [prob for prob in cf_common.cache2.problem_cache.problems if prob.contest_identifier == f'{problemContestId}{problemIndex}' ]
 
-        #getProblem gives a list. Something is wrong here since it does not work
         problems = [get_problem(prob.split('/')[0], prob.split('/')[1]) if prob != '0' else None for prob in problemEntries]
 
         replacementStr = 'This problem has been solved' if round_info.repeat == 0 else 'No problems of this rating left'
@@ -182,13 +198,8 @@ class Round(commands.Cog):
         embed = discord.Embed(description=desc, color=discord.Color.dark_magenta())
         embed.set_author(name="Lockout commands help", icon_url=ctx.me.avatar)
         embed.set_footer(
-            text="Use the prefix ; before each command. For detailed usage about a particular command, type ;help round <command>")
-        embed.add_field(name="GitHub repository", value=f"[GitHub](https://github.com/pseudocoder10/Lockout-Bot)",
-                        inline=True)
-        embed.add_field(name="Bot Invite link",
-                        value=f"[Invite](https://discord.com/oauth2/authorize?client_id=669978762120790045&permissions=0&scope=bot)",
-                        inline=True)
-        embed.add_field(name="Support Server", value=f"[Server](https://discord.gg/xP2UPUn)",
+            text="For detailed usage about a particular command, type ;help round <command>")
+        embed.add_field(name="Based on Lockout bot", value=f"[GitHub](https://github.com/pseudocoder10/Lockout-Bot)",
                         inline=True)
         return embed
 
@@ -215,6 +226,27 @@ class Round(commands.Cog):
         embed = discord_common.embed_success('Current lockout round channel')
         embed.add_field(name='Channel', value=channel.mention)
         await ctx.send(embed=embed)
+
+    async def _pick_problem(self, handles, rating, selected):
+        # pick problem
+        submissions = [await cf.user.status(handle=handle) for handle in handles]
+        solved = {sub.problem.name for subs in submissions for sub in subs if sub.verdict != 'COMPILATION_ERROR'} 
+
+        def get_problems(rating):
+            return [prob for prob in cf_common.cache2.problem_cache.problems
+                    if prob.rating == rating and prob.name not in solved
+                    and not any(cf_common.is_contest_writer(prob.contestId, handle) for handle in handles)
+                    and not cf_common.is_nonstandard_problem(prob)]
+
+        problems = get_problems(rating)
+        problems = [p for p in problems if p not in selected]
+        problems.sort(key=lambda problem: cf_common.cache2.contest_cache.get_contest(problem.contestId).startTimeSeconds)
+
+        if not problems:
+            raise RoundCogError(f'Not enough unsolved problems of rating {rating} available.')
+        choice = max(random.randrange(len(problems)) for _ in range(5)) 
+        problem = problems[choice]            
+        return problem
 
 
     @round.command(name="challenge", brief="Challenge multiple users to a round")
@@ -245,32 +277,16 @@ class Round(commands.Cog):
         # check for members still in a round
         self._check_if_any_member_is_already_in_round(ctx, members)
 
-        # pick problem
+        # pick problems
         handles = cf_common.members_to_handles(members, ctx.guild.id)
-        submissions = [await cf.user.status(handle=handle) for handle in handles]
-        solved = {sub.problem.name for subs in submissions for sub in subs if sub.verdict != 'COMPILATION_ERROR'} 
-
-        def get_problems(rating):
-            return [prob for prob in cf_common.cache2.problem_cache.problems
-                    if prob.rating == rating and prob.name not in solved
-                    and not any(cf_common.is_contest_writer(prob.contestId, handle) for handle in handles)
-                    and not cf_common.is_nonstandard_problem(prob)]
-
         selected = []
         for rating in ratings:
-            problems = get_problems(rating)
-            problems = [p for p in problems if p not in selected]
-            problems.sort(key=lambda problem: cf_common.cache2.contest_cache.get_contest(problem.contestId).startTimeSeconds)
-
-            if not problems:
-                raise RoundCogError(f'Not enough unsolved problems of rating {rating} available.')
-            choice = max(random.randrange(len(problems)) for _ in range(5)) 
-            problem = problems[choice]            
+            problem = await self._pick_problem(handles, rating, selected)
             selected.append(problem)
 
         await ctx.send(embed=discord.Embed(description="Starting the round...", color=discord.Color.green()))
 
-        cf_common.user_db.create_round(ctx.guild.id, time.time(), members, ratings, points, selected, duration, repeat)
+        cf_common.user_db.create_ongoing_round(ctx.guild.id, int(time.time()), members, ratings, points, selected, duration, repeat)
         round_info = cf_common.user_db.get_round_info(ctx.guild.id, members[0].id)
 
         await ctx.send(embed=self._round_problems_embed(round_info))
@@ -293,98 +309,177 @@ class Round(commands.Cog):
         round_info = cf_common.user_db.get_round_info(ctx.guild.id, member.id)
         await ctx.send(embed=self._round_problems_embed(round_info))
 
-#     @round.command(brief="Update matches status for the server")
-#     @cooldown(1, AUTO_UPDATE_TIME, BucketType.guild)
-#     async def update(self, ctx):
-#         await ctx.send(embed=discord.Embed(description="Updating rounds for this server", color=discord.Color.green()))
-#         rounds = self.db.get_all_rounds(ctx.guild.id)
+    # ranklist = [[DiscordUser, rank, elo]]
+    def _calculateChanges(self, ranklist):
+        ELO = elo.ELOMatch()
+        for player in ranklist:
+            ELO.addPlayer(player[0].id, player[1], player[2])
+        ELO.calculateELOs()
+        res = {}
+        for player in ranklist:
+            res[player[0].id] = [ELO.getELO(player[0].id), ELO.getELOChange(player[0].id)]
+        return res
 
-#         for round in rounds:
-#             try:
-#                 resp = await updation.update_round(round)
-#                 if not resp[0]:
-#                     logging_channel = await self.client.fetch_channel(os.environ.get("LOGGING_CHANNEL"))
-#                     await logging_channel.send(f"Error while updating rounds: {resp[1]}")
-#                     continue
-#                 resp = resp[1]
-#                 channel = self.client.get_channel(round.channel)
+    async def _get_solve_time(self, handle, contest_id, index):
+        subs = [sub for sub in await cf.user.status(handle=handle, count=RECENT_SUBS_LIMIT)
+                if (sub.verdict == 'OK' or sub.verdict == 'TESTING')
+                and sub.problem.contestId == contest_id
+                and sub.problem.index == index]
 
-#                 if resp[2] or resp[1]:
-#                     await channel.send(f"{' '.join([(await discord_.fetch_member(ctx.guild, int(m))).mention for m in round.users.split()])} there is an update in standings")
-
-#                 for i in range(len(resp[0])):
-#                     if len(resp[0][i]):
-#                         await channel.send(embed=discord.Embed(
-#                             description=f"{' '.join([(await discord_.fetch_member(ctx.guild, m)).mention for m in resp[0][i]])} has solved problem worth **{round.points.split()[i]}** points",
-#                             color=discord.Color.blue()))
-
-#                 if not resp[1] and resp[2]:
-#                     new_info = self.db.get_round_info(round.guild, round.users)
-#                     await channel.send(embed=discord_.round_problems_embed(new_info))
-
-#                 if resp[1]:
-#                     round_info = self.db.get_round_info(round.guild, round.users)
-#                     ranklist = updation.round_score(list(map(int, round_info.users.split())),
-#                                            list(map(int, round_info.status.split())),
-#                                            list(map(int, round_info.times.split())))
-#                     eloChanges = elo.calculateChanges([[(await discord_.fetch_member(ctx.guild, user.id)), user.rank, self.db.get_match_rating(round_info.guild, user.id)[-1]] for user in ranklist])
-
-#                     for id in list(map(int, round_info.users.split())):
-#                         self.db.add_rating_update(round_info.guild, id, eloChanges[id][0])
-
-#                     self.db.delete_round(round_info.guild, round_info.users)
-#                     self.db.add_to_finished_rounds(round_info)
-
-#                     embed = discord.Embed(color=discord.Color.dark_magenta())
-#                     pos, name, ratingChange = '', '', ''
-#                     for user in ranklist:
-#                         handle = self.db.get_handle(round_info.guild, user.id)
-#                         emojis = [":first_place:", ":second_place:", ":third_place:"]
-#                         pos += f"{emojis[user.rank-1] if user.rank <= len(emojis) else str(user.rank)} **{user.points}**\n"
-#                         name += f"[{handle}](https://codeforces.com/profile/{handle})\n"
-#                         ratingChange += f"{eloChanges[user.id][0]} (**{'+' if eloChanges[user.id][1] >= 0 else ''}{eloChanges[user.id][1]}**)\n"
-#                     embed.add_field(name="Position", value=pos)
-#                     embed.add_field(name="User", value=name)
-#                     embed.add_field(name="Rating changes", value=ratingChange)
-#                     embed.set_author(name=f"Round over! Final standings")
-#                     await channel.send(embed=embed)
-
-#                     if round_info.tournament == 1:
-#                         tournament_info = self.db.get_tournament_info(round_info.guild)
-#                         if not tournament_info or tournament_info.status != 2:
-#                             continue
-#                         if ranklist[1].rank == 1 and tournament_info.type != 2:
-#                             await discord_.send_message(channel, "Since the round ended in a draw, you will have to compete again for it to be counted in the tournament")
-#                         else:
-#                             res = await tournament_helper.validate_match(round_info.guild, ranklist[0].id, ranklist[1].id, self.api, self.db)
-#                             if not res[0]:
-#                                 await discord_.send_message(channel, res[1] + "\n\nIf you think this is a mistake, type `.tournament forcewin <handle>` to grant victory to a user")
-#                             else:
-#                                 draw = True if ranklist[1].rank == 1 else False
-#                                 scores = f"{ranklist[0].points}-{ranklist[1].points}" if res[1]['player1'] == res[1][
-#                                     ranklist[0].id] else f"{ranklist[1].points}-{ranklist[0].points}"
-#                                 match_resp = await self.api.post_match_results(res[1]['tournament_id'], res[1]['match_id'], scores, res[1][ranklist[0].id] if not draw else "tie")
-#                                 if not match_resp or 'errors' in match_resp:
-#                                     await discord_.send_message(channel, "Some error occurred while validating tournament match. \n\nType `.tournament forcewin <handle>` to grant victory to a user manually")
-#                                     if match_resp and 'errors' in match_resp:
-#                                         logging_channel = await self.client.fetch_channel(os.environ.get("LOGGING_CHANNEL"))
-#                                         await logging_channel.send(f"Error while validating tournament rounds: {match_resp['errors']}")
-#                                     continue
-#                                 winner_handle = self.db.get_handle(round_info.guild, ranklist[0].id)
-#                                 await discord_.send_message(channel, f"{f'Congrats **{winner_handle}** for qualifying to the next round. :tada:' if not draw else 'The round ended in a draw!'}\n\nTo view the list of future tournament rounds, type `.tournament matches`")
-#                                 if await tournament_helper.validate_tournament_completion(round_info.guild, self.api, self.db):
-#                                     await self.api.finish_tournament(res[1]['tournament_id'])
-#                                     await asyncio.sleep(3)
-#                                     winner_handle = await tournament_helper.get_winner(res[1]['tournament_id'], self.api)
-#                                     await channel.send(embed=tournament_helper.tournament_over_embed(round_info.guild, winner_handle, self.db))
-#                                     self.db.add_to_finished_tournaments(self.db.get_tournament_info(round_info.guild), winner_handle)
-#                                     self.db.delete_tournament(round_info.guild)
-
-#             except Exception as e:
-#                 logging_channel = await self.client.fetch_channel(os.environ.get("LOGGING_CHANNEL"))
-#                 await logging_channel.send(f"Error while updating rounds: {str(traceback.format_exc())}")
+        if not subs:
+            return PROBLEM_STATUS_UNSOLVED
+        if 'TESTING' in [sub.verdict for sub in subs]:
+            return PROBLEM_STATUS_TESTING
+        return min(subs, key=lambda sub: sub.creationTimeSeconds).creationTimeSeconds
 
 
+    def _no_round_change_possible(self, status, points, problems):
+        status.sort()
+        sum = 0
+        for i in range(len(points)):
+            if problems[i] != '0':
+                sum = sum + points[i]
+        for i in range(len(status) - 1):
+            if status[i] + sum > status[i + 1]:
+                return False
+        if len(status) == 1 and sum > 0:
+            return False
+        return True
+
+
+    async def _update_round(self, round_info):
+        user_ids = list(map(int, round_info.users.split()))
+        handles = [cf_common.user_db.get_handle(user_id, round_info.guild) for user_id in user_ids]
+        rating = list(map(int, round_info.rating.split()))
+        enter_time = time.time()
+        points = list(map(int, round_info.points.split()))
+        status = list(map(int, round_info.status.split()))
+        timestamp = list(map(int, round_info.times.split()))
+        problems = round_info.problems.split()
+
+        judging, over, updated = False, False, False
+        
+
+        updates = []
+
+        for i in range(len(problems)):
+            # Problem was solved before and no replacement -> skip
+            if problems[i] == '0':
+                updates.append([])
+                continue
+
+            times = [self._get_solve_time(handle, int(problems[i].split('/')[0]), problems[i].split('/')[1]) for handle in handles]
+
+            # There are pending submission that need to be judged -> skip this problem for now
+            if any([substatus == PROBLEM_STATUS_TESTING for substatus in times]):
+                judging = True
+                updates.append([])
+                continue
+
+            # Check if someone solved a problem
+            solved = []
+            for j in range(len(user_ids)):
+                if times[j] == min(times) and times[j] <= round_info.time + 60 * round_info.duration:
+                    solved.append(user_ids[j])
+                    status[j] += points[i]
+                    problems[i] = '0'
+                    timestamp[j] = max(timestamp[j], min(times))
+                    updated = True
+
+            updates.append((solved))
+
+            # Get new problem if repeat is set to 1
+            if len(solved) > 0 and round_info.repeat == 1:
+                try: 
+                    problem = await self._pick_problem(handles, rating[i], [])
+                    problems[i] = f"{problem.contestId}/{problem.index}"
+                except RoundCogError:
+                    problems[i] = '0'
+
+        # If changes to the round state were made update the DB
+        if updated:
+            cf_common.user_db.update_round_status(round_info.guild, user_ids[0], status, problems, timestamp)
+
+        # check if round is over (time over or no more ranklist changes possible)
+        if not judging and (enter_time > round_info.time + 60 * round_info.duration or (round_info.repeat == 0 and self._no_round_change_possible(status[:], points, problems))):
+            over = True
+        return [True, [updates, over, updated]]
+
+    async def _check_ongoing_rounds_for_guild(self, guild):
+        channel_id = cf_common.user_db.get_duel_channel(guild.id)
+        if channel_id == None:
+            logger.warn(f'_check_ongoing_duels_for_guild: duel channel is not set.')
+            return
+
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            logger.warn(f'_check_ongoing_duels_for_guild: duel channel is not found on the server.')
+            return
+
+        rounds = cf_common.user_db.get_ongoing_rounds(guild.id)
+        for round in rounds:
+            await self._check_round_complete(guild, channel, round, True)            
+
+    async def _check_round_complete(self, guild, channel, round, isAutomaticRun = False):
+        resp = await self._update_round(round)
+        if not resp[0]:
+            logger.warn(f'Error while updating rounds: {resp[1]}')
+            return
+        resp = resp[1]
+
+        if resp[2] or resp[1]:
+            await channel.send(f"{' '.join([(guild.get_member(int(m))).mention for m in round.users.split()])} there is an update in standings")
+
+        for i in range(len(resp[0])):
+            if len(resp[0][i]):
+                await channel.send(embed=discord.Embed(
+                    description=f"{' '.join([(guild.get_member(m)).mention for m in resp[0][i]])} has solved problem worth **{round.points.split()[i]}** points",
+                    color=discord.Color.blue()))
+
+        if not resp[1] and resp[2]:
+            new_info = cf_common.user_db.get_round_info(round.guild, round.users)
+            await channel.send(embed=self._round_problems_embed(new_info))
+
+        if resp[1]:
+            round_info = self.db.get_round_info(round.guild, round.users)
+            ranklist = self._round_score(list(map(int, round_info.users.split())),
+                                    list(map(int, round_info.status.split())),
+                                    list(map(int, round_info.times.split())))
+
+            # change duel rating
+            eloChanges = self._calculateChanges([[(guild.get_member(user.id)), user.rank, cf_common.user_db.cf_common.user_db.get_duel_rating(user.id, guild.id)] for user in ranklist])
+            for id in list(map(int, round_info.users.split())):
+                cf_common.user_db.update_duel_rating(id, guild.id, eloChanges[id][1])
+
+
+            cf_common.user_db.delete_round(round_info.guild, round_info.users)
+            cf_common.user_db.add_to_finished_rounds(round_info, int(time.time()))
+
+
+            ### extract into function
+            embed = discord.Embed(color=discord.Color.dark_magenta())
+            pos, name, ratingChange = '', '', ''
+            for user in ranklist:
+                handle = cf_common.user_db.get_handle(round_info.guild, user.id)
+                emojis = [":first_place:", ":second_place:", ":third_place:"]
+                pos += f"{emojis[user.rank-1] if user.rank <= len(emojis) else str(user.rank)} **{user.points}**\n"
+                name += f"[{handle}](https://codeforces.com/profile/{handle})\n"
+                ratingChange += f"{eloChanges[user.id][0]} (**{'+' if eloChanges[user.id][1] >= 0 else ''}{eloChanges[user.id][1]}**)\n"
+            embed.add_field(name="Position", value=pos)
+            embed.add_field(name="User", value=name)
+            embed.add_field(name="Rating changes", value=ratingChange)
+            embed.set_author(name=f"Round over! Final standings")
+
+            await channel.send(embed=embed)
+
+
+    @round.command(brief="Update matches status for the server")
+    @cooldown(1, AUTO_UPDATE_TIME, BucketType.guild)
+    async def update(self, ctx):
+        await ctx.send(embed=discord.Embed(description="Updating rounds for this server", color=discord.Color.green()))
+        rounds = self.db.get_ongoing_rounds(ctx.guild.id)
+        for round in rounds:
+            self._check_round_complete(ctx.guild, ctx.channel, round, False)
 
 #     @round.command(name="ongoing", brief="View ongoing rounds")
 #     async def ongoing(self, ctx):
