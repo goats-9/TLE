@@ -323,15 +323,13 @@ class Round(commands.Cog):
     async def _get_solve_time(self, handle, contest_id, index):
         subs = [sub for sub in await cf.user.status(handle=handle, count=RECENT_SUBS_LIMIT)
                 if (sub.verdict == 'OK' or sub.verdict == 'TESTING')
-                and sub.problem.contestId == contest_id
-                and sub.problem.index == index]
+                and sub.problem.contest_identifier == f'{contest_id}{index}']
 
         if not subs:
             return PROBLEM_STATUS_UNSOLVED
         if 'TESTING' in [sub.verdict for sub in subs]:
             return PROBLEM_STATUS_TESTING
         return min(subs, key=lambda sub: sub.creationTimeSeconds).creationTimeSeconds
-
 
     def _no_round_change_possible(self, status, points, problems):
         status.sort()
