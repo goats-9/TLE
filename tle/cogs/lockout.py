@@ -31,7 +31,7 @@ MAX_ALTS = 5
 ROUNDS_PER_PAGE = 5
 AUTO_UPDATE_TIME = 30
 RECENT_SUBS_LIMIT = 50
-PROBLEM_STATUS_UNSOLVED = 0
+PROBLEM_STATUS_UNSOLVED = 10**18
 PROBLEM_STATUS_TESTING = -1
 
 
@@ -377,7 +377,7 @@ class Round(commands.Cog):
             # Check if someone solved a problem
             solved = []
             for j in range(len(user_ids)):
-                if times[j] == min(times) and times[j] <= round_info.time + 60 * round_info.duration:
+                if times[j] != PROBLEM_STATUS_UNSOLVED and times[j] == min(times) and times[j] <= round_info.time + 60 * round_info.duration:
                     solved.append(user_ids[j])
                     status[j] += points[i]
                     problems[i] = '0'
