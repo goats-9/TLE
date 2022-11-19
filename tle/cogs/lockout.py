@@ -62,7 +62,7 @@ class Round(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         # self.cf = cf_api.CodeforcesAPI()
-        # self.api = challonge_api.ChallongeAPI(self.client)
+        # self.api = challonge_api.ChallongeAPI(self.bot)
 
     @commands.Cog.listener()
     @discord_common.once
@@ -96,7 +96,7 @@ class Round(commands.Cog):
 
         while True:
             try:
-                _, member = await self.client.wait_for('reaction_add', timeout=30, check=check)
+                _, member = await self.bot.wait_for('reaction_add', timeout=30, check=check)
                 reacted.append(member)
                 if all(item in reacted for item in members):
                     all_reacted = True
@@ -191,7 +191,7 @@ class Round(commands.Cog):
     
     def make_round_embed(self, ctx):
         desc = "Information about Round related commands! **[use ;round <command>]**\n\n"
-        match = self.client.get_command('round')
+        match = self.bot.get_command('round')
 
         for cmd in match.commands:
             desc += f"`{cmd.name}`: **{cmd.brief}**\n"
@@ -264,15 +264,15 @@ class Round(commands.Cog):
 
         await self._check_if_all_members_ready(ctx, members)           
 
-        problem_cnt = await self._get_time_response(self.client, ctx, f"{ctx.author.mention} enter the number of problems between [1, {MAX_PROBLEMS}]", 30, ctx.author, [1, MAX_PROBLEMS])
+        problem_cnt = await self._get_time_response(self.bot, ctx, f"{ctx.author.mention} enter the number of problems between [1, {MAX_PROBLEMS}]", 30, ctx.author, [1, MAX_PROBLEMS])
 
-        duration = await self._get_time_response(self.client, ctx, f"{ctx.author.mention} enter the duration of match in minutes between {MATCH_DURATION}", 30, ctx.author, MATCH_DURATION)
+        duration = await self._get_time_response(self.bot, ctx, f"{ctx.author.mention} enter the duration of match in minutes between {MATCH_DURATION}", 30, ctx.author, MATCH_DURATION)
 
-        ratings = await self._get_seq_response(self.client, ctx, f"{ctx.author.mention} enter {problem_cnt} space seperated integers denoting the ratings of problems (between {LOWER_RATING} and {UPPER_RATING})", 60, problem_cnt, ctx.author, [LOWER_RATING, UPPER_RATING])
+        ratings = await self._get_seq_response(self.bot, ctx, f"{ctx.author.mention} enter {problem_cnt} space seperated integers denoting the ratings of problems (between {LOWER_RATING} and {UPPER_RATING})", 60, problem_cnt, ctx.author, [LOWER_RATING, UPPER_RATING])
 
-        points = await self._get_seq_response(self.client, ctx, f"{ctx.author.mention} enter {problem_cnt} space seperated integer denoting the points of problems (between 100 and 10,000)", 60, problem_cnt, ctx.author, [100, 10000])
+        points = await self._get_seq_response(self.bot, ctx, f"{ctx.author.mention} enter {problem_cnt} space seperated integer denoting the points of problems (between 100 and 10,000)", 60, problem_cnt, ctx.author, [100, 10000])
 
-        repeat = await self._get_time_response(self.client, ctx, f"{ctx.author.mention} do you want a new problem to appear when someone solves a problem (type 1 for yes and 0 for no)", 30, ctx.author, [0, 1])
+        repeat = await self._get_time_response(self.bot, ctx, f"{ctx.author.mention} do you want a new problem to appear when someone solves a problem (type 1 for yes and 0 for no)", 30, ctx.author, [0, 1])
 
         # check for members still in a round
         self._check_if_any_member_is_already_in_round(ctx, members)
@@ -506,11 +506,11 @@ class Round(commands.Cog):
 
 #         def check(reaction, user):
 #             return reaction.message.id == message.id and reaction.emoji in ["⏮", "◀", "▶",
-#                                                                             "⏭"] and user != self.client.user
+#                                                                             "⏭"] and user != self.bot.user
 
 #         while True:
 #             try:
-#                 reaction, user = await self.client.wait_for('reaction_add', timeout=90, check=check)
+#                 reaction, user = await self.bot.wait_for('reaction_add', timeout=90, check=check)
 #                 try:
 #                     await reaction.remove(user)
 #                 except Exception:
@@ -560,11 +560,11 @@ class Round(commands.Cog):
 
 #         def check(reaction, user):
 #             return reaction.message.id == message.id and reaction.emoji in ["⏮", "◀", "▶",
-#                                                                             "⏭"] and user != self.client.user
+#                                                                             "⏭"] and user != self.bot.user
 
 #         while True:
 #             try:
-#                 reaction, user = await self.client.wait_for('reaction_add', timeout=90, check=check)
+#                 reaction, user = await self.bot.wait_for('reaction_add', timeout=90, check=check)
 #                 try:
 #                     await reaction.remove(user)
 #                 except Exception:
@@ -656,7 +656,7 @@ class Round(commands.Cog):
 
 #         while True:
 #             try:
-#                 reaction, user = await self.client.wait_for('reaction_add', timeout=30, check=check)
+#                 reaction, user = await self.bot.wait_for('reaction_add', timeout=30, check=check)
 #                 reacted.append(user)
 #                 if all(item in reacted for item in users):
 #                     all_reacted = True
@@ -668,7 +668,7 @@ class Round(commands.Cog):
 #             await discord_.send_message(ctx, f"Unable to start round, some participant(s) did not react in time!")
 #             return
 
-#         problem_cnt = await discord_.get_time_response(self.client, ctx,
+#         problem_cnt = await discord_.get_time_response(self.bot, ctx,
 #                                                        f"{ctx.author.mention} enter the number of problems between [1, {MAX_PROBLEMS}]",
 #                                                        30, ctx.author, [1, MAX_PROBLEMS])
 #         if not problem_cnt[0]:
@@ -676,7 +676,7 @@ class Round(commands.Cog):
 #             return
 #         problem_cnt = problem_cnt[1]
 
-#         duration = await discord_.get_time_response(self.client, ctx,
+#         duration = await discord_.get_time_response(self.bot, ctx,
 #                                                     f"{ctx.author.mention} enter the duration of match in minutes between {MATCH_DURATION}",
 #                                                     30, ctx.author, MATCH_DURATION)
 #         if not duration[0]:
@@ -684,7 +684,7 @@ class Round(commands.Cog):
 #             return
 #         duration = duration[1]
 
-#         problems = await discord_.get_problems_response(self.client, ctx,
+#         problems = await discord_.get_problems_response(self.bot, ctx,
 #                                                  f"{ctx.author.mention} enter {problem_cnt} space seperated problem ids denoting the problems. Eg: `123/A 455/B 242/C ...`",
 #                                                  60, problem_cnt, ctx.author)
 #         if not problems[0]:
@@ -692,7 +692,7 @@ class Round(commands.Cog):
 #             return
 #         problems = problems[1]
 
-#         points = await discord_.get_seq_response(self.client, ctx,
+#         points = await discord_.get_seq_response(self.bot, ctx,
 #                                                  f"{ctx.author.mention} enter {problem_cnt} space seperated integer denoting the points of problems (between 100 and 10,000)",
 #                                                  60, problem_cnt, ctx.author, [100, 10000])
 #         if not points[0]:
@@ -708,7 +708,7 @@ class Round(commands.Cog):
 
 #         tournament = 0
 #         if len(users) == 2 and (await tournament_helper.is_a_match(ctx.guild.id, users[0].id, users[1].id, self.api, self.db)):
-#             tournament = await discord_.get_time_response(self.client, ctx,
+#             tournament = await discord_.get_time_response(self.bot, ctx,
 #                                                           f"{ctx.author.mention} this round is a part of the tournament. Do you want the result of this round to be counted in the tournament. Type `1` for yes and `0` for no",
 #                                                           30, ctx.author, [0, 1])
 #             if not tournament[0]:
