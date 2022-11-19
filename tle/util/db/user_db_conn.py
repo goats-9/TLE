@@ -1282,7 +1282,7 @@ class UserDbConn:
 
     def get_ongoing_rounds(self, guild):
         query = f"""
-                    SELECT * FROM ongoing_rounds WHERE guild = ?
+                    SELECT * FROM lockout_ongoing_rounds WHERE guild = ?
                 """
         cur = self.conn.cursor()
         cur.execute(query, (guild,))
