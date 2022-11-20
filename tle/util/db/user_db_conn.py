@@ -1220,7 +1220,7 @@ class UserDbConn:
                 '''
         cur = self.conn.cursor()
         cur.execute(query, (round_info.guild, round_info.users, round_info.rating, round_info.points, round_info.time,
-                                round_info.channel, round_info.problems, round_info.status, round_info.duration, round_info.repeat,
+                                round_info.problems, round_info.status, round_info.duration, round_info.repeat,
                                 round_info.times, timestamp))
         self.conn.commit()
         cur.close()                

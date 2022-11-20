@@ -479,7 +479,7 @@ class Round(commands.Cog):
         await ctx.send(embed=discord.Embed(description="Updating rounds for this server", color=discord.Color.green()))
         rounds = cf_common.user_db.get_ongoing_rounds(ctx.guild.id)
         for round in rounds:
-            self._check_round_complete(ctx.guild, ctx.channel, round, False)
+            await self._check_round_complete(ctx.guild, ctx.channel, round, False)
 
 #     @round.command(name="ongoing", brief="View ongoing rounds")
 #     async def ongoing(self, ctx):
