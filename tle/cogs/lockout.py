@@ -185,7 +185,7 @@ class Round(commands.Cog):
 
         replacementStr = 'This problem has been solved' if round_info.repeat == 0 else 'No problems of this rating left'
         names = [f'[{prob[0].name}](https://codeforces.com/contest/{prob[0].contestId}/problem/{prob[0].index})' 
-                    if len(prob) > 0 and prob[0] != '0' else replacementStr for prob in problems]
+                    if prob is not None else replacementStr for prob in problems]
 
         desc = ""
         for user in ranklist:
