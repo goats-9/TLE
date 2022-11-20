@@ -75,6 +75,21 @@ class Round(commands.Cog):
         await asyncio.sleep(AUTO_UPDATE_TIME)
         asyncio.create_task(self._check_ongoing_rounds()) 
 
+    async def _check_ongoing_rounds_for_guild(self, guild):
+        channel_id = cf_common.user_db.get_round_channel(guild.id)
+        if channel_id == None:
+            logger.warn(f'_check_ongoing_rounds_for_guild: lockout round channel is not set.')
+            return
+
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            logger.warn(f'_check_ongoing_rounds_for_guild: lockout round channel is not found on the server.')
+            return
+
+        rounds = cf_common.user_db.get_ongoing_rounds(guild.id)
+        for round in rounds:
+            await self._check_round_complete(guild, channel, round, True)         
+
     def _check_if_correct_channel(self, ctx):
         lockout_channel_id = cf_common.user_db.get_round_channel(ctx.guild.id)
         channel = ctx.guild.get_channel(lockout_channel_id)
@@ -227,19 +242,15 @@ class Round(commands.Cog):
         embed.add_field(name='Channel', value=channel.mention)
         await ctx.send(embed=embed)
 
-    async def _pick_problem(self, handles, rating, selected):
-        # pick problem
-        submissions = [await cf.user.status(handle=handle) for handle in handles]
-        solved = {sub.problem.name for subs in submissions for sub in subs if sub.verdict != 'COMPILATION_ERROR'} 
-
+    async def _pick_problem(self, handles, solved, rating, selected):
         def get_problems(rating):
             return [prob for prob in cf_common.cache2.problem_cache.problems
                     if prob.rating == rating and prob.name not in solved
                     and not any(cf_common.is_contest_writer(prob.contestId, handle) for handle in handles)
-                    and not cf_common.is_nonstandard_problem(prob)]
+                    and not cf_common.is_nonstandard_problem(prob)
+                    and prob not in selected]
 
         problems = get_problems(rating)
-        problems = [p for p in problems if p not in selected]
         problems.sort(key=lambda problem: cf_common.cache2.contest_cache.get_contest(problem.contestId).startTimeSeconds)
 
         if not problems:
@@ -279,9 +290,11 @@ class Round(commands.Cog):
 
         # pick problems
         handles = cf_common.members_to_handles(members, ctx.guild.id)
+        submissions = [await cf.user.status(handle=handle) for handle in handles]        
+        solved = {sub.problem.name for subs in submissions for sub in subs if sub.verdict != 'COMPILATION_ERROR'} 
         selected = []
         for rating in ratings:
-            problem = await self._pick_problem(handles, rating, selected)
+            problem = await self._pick_problem(handles, solved, rating, selected)
             selected.append(problem)
 
         await ctx.send(embed=discord.Embed(description="Starting the round...", color=discord.Color.green()))
@@ -359,7 +372,6 @@ class Round(commands.Cog):
         problems = round_info.problems.split()
 
         judging, over, updated = False, False, False
-        
 
         updates = []
 
@@ -406,20 +418,7 @@ class Round(commands.Cog):
             over = True
         return updates, over, updated
 
-    async def _check_ongoing_rounds_for_guild(self, guild):
-        channel_id = cf_common.user_db.get_round_channel(guild.id)
-        if channel_id == None:
-            logger.warn(f'_check_ongoing_rounds_for_guild: lockout round channel is not set.')
-            return
-
-        channel = self.bot.get_channel(channel_id)
-        if channel is None:
-            logger.warn(f'_check_ongoing_rounds_for_guild: lockout round channel is not found on the server.')
-            return
-
-        rounds = cf_common.user_db.get_ongoing_rounds(guild.id)
-        for round in rounds:
-            await self._check_round_complete(guild, channel, round, True)            
+           
 
     async def _check_round_complete(self, guild, channel, round, isAutomaticRun = False):
         updates, over, updated = await self._update_round(round)
