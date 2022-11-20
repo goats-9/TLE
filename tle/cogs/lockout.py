@@ -313,7 +313,7 @@ class Round(commands.Cog):
         await ctx.send(embed=self._round_problems_embed(round_info))
 
     # ranklist = [[DiscordUser, rank, elo]]
-    def _calculateChanges(self, ranklist):
+    def _calculateRatingChanges(self, ranklist):
         ELO = elo.ELOMatch()
         for player in ranklist:
             ELO.addPlayer(player[0].id, player[1], player[2])
@@ -393,7 +393,7 @@ class Round(commands.Cog):
             if len(solved) > 0 and round_info.repeat == 1:
                 try: 
                     problem = await self._pick_problem(handles, rating[i], [])
-                    problems[i] = f"{problem.contestId}/{problem.index}"
+                    problems[i] = f'{problem.contestId}/{problem.index}'
                 except RoundCogError:
                     problems[i] = '0'
 
@@ -404,7 +404,7 @@ class Round(commands.Cog):
         # check if round is over (time over or no more ranklist changes possible)
         if not judging and (enter_time > round_info.time + 60 * round_info.duration or (round_info.repeat == 0 and self._no_round_change_possible(status[:], points, problems))):
             over = True
-        return [True, [updates, over, updated]]
+        return updates, over, updated
 
     async def _check_ongoing_rounds_for_guild(self, guild):
         channel_id = cf_common.user_db.get_round_channel(guild.id)
@@ -422,39 +422,35 @@ class Round(commands.Cog):
             await self._check_round_complete(guild, channel, round, True)            
 
     async def _check_round_complete(self, guild, channel, round, isAutomaticRun = False):
-        resp = await self._update_round(round)
-        if not resp[0]:
-            logger.warn(f'Error while updating rounds: {resp[1]}')
-            return
-        resp = resp[1]
+        updates, over, updated = await self._update_round(round)
 
-        if resp[2] or resp[1]:
+        if updated or over:
             await channel.send(f"{' '.join([(guild.get_member(int(m))).mention for m in round.users.split()])} there is an update in standings")
 
-        for i in range(len(resp[0])):
-            if len(resp[0][i]):
+        for i in range(len(updates)):
+            if len(updates[i]):
                 await channel.send(embed=discord.Embed(
-                    description=f"{' '.join([(guild.get_member(m)).mention for m in resp[0][i]])} has solved problem worth **{round.points.split()[i]}** points",
+                    description=f"{' '.join([(guild.get_member(m)).mention for m in updates[i]])} has solved problem worth **{round.points.split()[i]}** points",
                     color=discord.Color.blue()))
 
-        if not resp[1] and resp[2]:
+        if not over and updated:
             new_info = cf_common.user_db.get_round_info(round.guild, round.users)
             await channel.send(embed=self._round_problems_embed(new_info))
 
-        if resp[1]:
+        if over:
             round_info = cf_common.user_db.get_round_info(round.guild, round.users)
             ranklist = _calc_round_score(list(map(int, round_info.users.split())),
                                     list(map(int, round_info.status.split())),
                                     list(map(int, round_info.times.split())))
 
             # change duel rating
-            eloChanges = self._calculateChanges([[(guild.get_member(user.id)), user.rank, cf_common.user_db.cf_common.user_db.get_duel_rating(user.id, guild.id)] for user in ranklist])
+            eloChanges = self._calculateRatingChanges([[(guild.get_member(user.id)), user.rank, cf_common.user_db.get_duel_rating(user.id, guild.id)] for user in ranklist])
             for id in list(map(int, round_info.users.split())):
                 cf_common.user_db.update_duel_rating(id, guild.id, eloChanges[id][1])
 
 
             cf_common.user_db.delete_round(round_info.guild, round_info.users)
-            cf_common.user_db.add_to_finished_rounds(round_info, int(time.time()))
+            cf_common.user_db.create_finished_round(round_info, int(time.time()))
 
 
             ### extract into function
