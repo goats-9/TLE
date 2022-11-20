@@ -404,7 +404,7 @@ class Round(commands.Cog):
         return [True, [updates, over, updated]]
 
     async def _check_ongoing_rounds_for_guild(self, guild):
-        channel_id = cf_common.user_db.get_lockout_channel(guild.id)
+        channel_id = cf_common.user_db.get_round_channel(guild.id)
         if channel_id == None:
             logger.warn(f'_check_ongoing_rounds_for_guild: lockout round channel is not set.')
             return
