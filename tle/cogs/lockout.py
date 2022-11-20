@@ -404,14 +404,14 @@ class Round(commands.Cog):
         return [True, [updates, over, updated]]
 
     async def _check_ongoing_rounds_for_guild(self, guild):
-        channel_id = cf_common.user_db.get_duel_channel(guild.id)
+        channel_id = cf_common.user_db.get_lockout_channel(guild.id)
         if channel_id == None:
-            logger.warn(f'_check_ongoing_duels_for_guild: duel channel is not set.')
+            logger.warn(f'_check_ongoing_rounds_for_guild: lockout round channel is not set.')
             return
 
         channel = self.bot.get_channel(channel_id)
         if channel is None:
-            logger.warn(f'_check_ongoing_duels_for_guild: duel channel is not found on the server.')
+            logger.warn(f'_check_ongoing_rounds_for_guild: lockout round channel is not found on the server.')
             return
 
         rounds = cf_common.user_db.get_ongoing_rounds(guild.id)
@@ -440,7 +440,7 @@ class Round(commands.Cog):
 
         if resp[1]:
             round_info = cf_common.user_db.get_round_info(round.guild, round.users)
-            ranklist = self._round_score(list(map(int, round_info.users.split())),
+            ranklist = _calc_round_score(list(map(int, round_info.users.split())),
                                     list(map(int, round_info.status.split())),
                                     list(map(int, round_info.times.split())))
 
