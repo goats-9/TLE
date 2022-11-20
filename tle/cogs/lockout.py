@@ -456,7 +456,7 @@ class Round(commands.Cog):
             embed = discord.Embed(color=discord.Color.dark_magenta())
             pos, name, ratingChange = '', '', ''
             for user in ranklist:
-                handle = cf_common.user_db.get_handle(round_info.guild, user.id)
+                handle = cf_common.user_db.get_handle(user.id, round_info.guild)
                 emojis = [":first_place:", ":second_place:", ":third_place:"]
                 pos += f"{emojis[user.rank-1] if user.rank <= len(emojis) else str(user.rank)} **{user.points}**\n"
                 name += f"[{handle}](https://codeforces.com/profile/{handle})\n"
