@@ -272,7 +272,6 @@ class UserDbConn:
                 channel_id TEXT
             )
         ''')
-        self.conn.execute('''DROP TABLE lockout_ongoing_rounds''')
         self.conn.execute('''
             CREATE TABLE IF NOT EXISTS lockout_ongoing_rounds (
                 "id"	INTEGER PRIMARY KEY AUTOINCREMENT,
