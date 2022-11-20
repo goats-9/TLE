@@ -79,7 +79,7 @@ class Round(commands.Cog):
         lockout_channel_id = cf_common.user_db.get_round_channel(ctx.guild.id)
         channel = ctx.guild.get_channel(lockout_channel_id)
         if not lockout_channel_id or ctx.channel.id != lockout_channel_id:
-            raise RoundCogError('You must use this command in lockout round channel ({channel.mention}).')
+            raise RoundCogError(f'You must use this command in lockout round channel ({channel.mention}).')
 
     async def _check_if_all_members_ready(self, ctx, members):
         embed = discord.Embed(description=f"{' '.join(x.mention for x in members)} react on the message with ✅ within 30 seconds to join the round. {'Since you are the only participant, this will be a practice round and there will be no rating changes' if len(members) == 1 else ''}",
@@ -301,6 +301,9 @@ class Round(commands.Cog):
 
     @round.command(brief="View problems of a round")
     async def problems(self, ctx, member: discord.Member=None):
+        # check if we are in the correct channel
+        self._check_if_correct_channel(ctx)
+
         if not member:
             member = ctx.author
         if not cf_common.user_db.check_if_user_in_ongoing_round(ctx.guild.id, member.id):
@@ -474,6 +477,9 @@ class Round(commands.Cog):
     @round.command(brief="Update matches status for the server")
     @cooldown(1, AUTO_UPDATE_TIME, BucketType.guild)
     async def update(self, ctx):
+        # check if we are in the correct channel
+        self._check_if_correct_channel(ctx)
+
         await ctx.send(embed=discord.Embed(description="Updating rounds for this server", color=discord.Color.green()))
         rounds = cf_common.user_db.get_ongoing_rounds(ctx.guild.id)
         for round in rounds:
