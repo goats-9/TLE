@@ -418,7 +418,22 @@ class Round(commands.Cog):
             over = True
         return updates, over, updated
 
-           
+    async def _round_end_embed(self, channel, round_info, ranklist, eloChanges):
+        ### extract into function
+        embed = discord.Embed(color=discord.Color.dark_magenta())
+        pos, name, ratingChange = '', '', ''
+        for user in ranklist:
+            handle = cf_common.user_db.get_handle(user.id, round_info.guild)
+            emojis = [":first_place:", ":second_place:", ":third_place:"]
+            pos += f"{emojis[user.rank-1] if user.rank <= len(emojis) else str(user.rank)} **{user.points}**\n"
+            name += f"[{handle}](https://codeforces.com/profile/{handle})\n"
+            ratingChange += f"{eloChanges[user.id][0]} (**{'+' if eloChanges[user.id][1] >= 0 else ''}{eloChanges[user.id][1]}**)\n"
+        embed.add_field(name="Position", value=pos)
+        embed.add_field(name="User", value=name)
+        embed.add_field(name="Rating changes", value=ratingChange)
+        embed.set_author(name=f"Round over! Final standings")
+
+        await channel.send(embed=embed)           
 
     async def _check_round_complete(self, guild, channel, round, isAutomaticRun = False):
         updates, over, updated = await self._update_round(round)
@@ -433,9 +448,10 @@ class Round(commands.Cog):
                     color=discord.Color.blue()))
 
         if not over and updated:
-            new_info = cf_common.user_db.get_round_info(round.guild, round.users)
-            await channel.send(embed=self._round_problems_embed(new_info))
+            round_info = cf_common.user_db.get_round_info(round.guild, round.users)
+            await channel.send(embed=self._round_problems_embed(round_info))
 
+        # round ended -> make rating changes, change db, show results
         if over:
             round_info = cf_common.user_db.get_round_info(round.guild, round.users)
             ranklist = _calc_round_score(list(map(int, round_info.users.split())),
@@ -451,22 +467,7 @@ class Round(commands.Cog):
             cf_common.user_db.delete_round(round_info.guild, round_info.users)
             cf_common.user_db.create_finished_round(round_info, int(time.time()))
 
-
-            ### extract into function
-            embed = discord.Embed(color=discord.Color.dark_magenta())
-            pos, name, ratingChange = '', '', ''
-            for user in ranklist:
-                handle = cf_common.user_db.get_handle(user.id, round_info.guild)
-                emojis = [":first_place:", ":second_place:", ":third_place:"]
-                pos += f"{emojis[user.rank-1] if user.rank <= len(emojis) else str(user.rank)} **{user.points}**\n"
-                name += f"[{handle}](https://codeforces.com/profile/{handle})\n"
-                ratingChange += f"{eloChanges[user.id][0]} (**{'+' if eloChanges[user.id][1] >= 0 else ''}{eloChanges[user.id][1]}**)\n"
-            embed.add_field(name="Position", value=pos)
-            embed.add_field(name="User", value=name)
-            embed.add_field(name="Rating changes", value=ratingChange)
-            embed.set_author(name=f"Round over! Final standings")
-
-            await channel.send(embed=embed)
+            await self._round_end_embed(channel, round_info, ranklist, eloChanges)
 
 
     @round.command(brief="Update matches status for the server")
