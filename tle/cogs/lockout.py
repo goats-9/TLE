@@ -439,7 +439,7 @@ class Round(commands.Cog):
             await channel.send(embed=self._round_problems_embed(new_info))
 
         if resp[1]:
-            round_info = self.db.get_round_info(round.guild, round.users)
+            round_info = cf_common.user_db.get_round_info(round.guild, round.users)
             ranklist = self._round_score(list(map(int, round_info.users.split())),
                                     list(map(int, round_info.status.split())),
                                     list(map(int, round_info.times.split())))
@@ -475,7 +475,7 @@ class Round(commands.Cog):
     @cooldown(1, AUTO_UPDATE_TIME, BucketType.guild)
     async def update(self, ctx):
         await ctx.send(embed=discord.Embed(description="Updating rounds for this server", color=discord.Color.green()))
-        rounds = self.db.get_ongoing_rounds(ctx.guild.id)
+        rounds = cf_common.user_db.get_ongoing_rounds(ctx.guild.id)
         for round in rounds:
             self._check_round_complete(ctx.guild, ctx.channel, round, False)
 
