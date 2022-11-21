@@ -1293,16 +1293,3 @@ class UserDbConn:
     def close(self):
         self.conn.close()
 
-            # CREATE TABLE IF NOT EXISTS lockout_ongoing_rounds (
-            #     "id"	INTEGER PRIMARY KEY AUTOINCREMENT,
-            #     "guild" TEXT,
-            #     "users" TEXT,
-            #     "rating" TEXT,
-            #     "points" TEXT,
-            #     "time" INT,
-            #     "problems" TEXT,
-            #     "status" TEXT,
-            #     "duration" INTEGER,
-            #     "repeat" INTEGER,
-            #     "times" TEXT
-            # )
