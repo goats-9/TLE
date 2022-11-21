@@ -486,7 +486,7 @@ class Round(commands.Cog):
 
         await ctx.send(embed=discord.Embed(description="Updating rounds for this server", color=discord.Color.green()))
 
-        self._update_all_ongoing_rounds(ctx.guild, ctx.channel, False)
+        await self._update_all_ongoing_rounds(ctx.guild, ctx.channel, False)
 
         
 
