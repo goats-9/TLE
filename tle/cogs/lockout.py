@@ -353,8 +353,8 @@ class Round(commands.Cog):
             res[player[0].id] = [ELO.getELO(player[0].id), ELO.getELOChange(player[0].id)]
         return res
 
-    async def _get_solve_time(self, handle, contest_id, index):
-        subs = [sub for sub in await cf.user.status(handle=handle, count=RECENT_SUBS_LIMIT)
+    async def _get_solve_time(self, recent_subs, contest_id, index):
+        subs = [sub for sub in recent_subs
                 if (sub.verdict == 'OK' or sub.verdict == 'TESTING')
                 and sub.problem.contest_identifier == f'{contest_id}{index}']
 
@@ -406,14 +406,14 @@ class Round(commands.Cog):
         judging, over, updated = False, False, False
 
         updates = []
-
+        recent_subs = [await cf.user.status(handle=handle, count=RECENT_SUBS_LIMIT) for handle in handles]
         for i in range(len(problems)):
             # Problem was solved before and no replacement -> skip
             if problems[i] == '0':
                 updates.append([])
                 continue
 
-            times = [await self._get_solve_time(handle, int(problems[i].split('/')[0]), problems[i].split('/')[1]) for handle in handles]
+            times = [await self._get_solve_time(recent_subs[index], int(problems[i].split('/')[0]), problems[i].split('/')[1]) for index in range(len(handles))]
 
             # There are pending submission that need to be judged -> skip this problem for now
             if any([substatus == PROBLEM_STATUS_TESTING for substatus in times]):
@@ -438,7 +438,7 @@ class Round(commands.Cog):
                 try: 
                     submissions = [await cf.user.status(handle=handle) for handle in handles]        
                     solved = {sub.problem.name for subs in submissions for sub in subs if sub.verdict != 'COMPILATION_ERROR'} 
-                    problem = await self._pick_problem(handles, submissions, rating[i], [])
+                    problem = await self._pick_problem(handles, solved, rating[i], [])
                     problems[i] = f'{problem.contestId}/{problem.index}'
                 except RoundCogError:
                     problems[i] = '0'
