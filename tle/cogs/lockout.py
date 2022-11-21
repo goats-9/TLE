@@ -84,7 +84,7 @@ class Round(commands.Cog):
             logger.warn(f'_check_ongoing_rounds_for_guild: lockout round channel is not found on the server.')
             return
 
-        self._update_all_ongoing_rounds(guild, channel, True)
+        await self._update_all_ongoing_rounds(guild, channel, True)
 
     async def _update_all_ongoing_rounds(self, guild, channel, isAutomaticRun):
         self.lock.acquire()
