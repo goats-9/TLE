@@ -4,7 +4,6 @@ import discord
 import asyncio
 import time
 import logging
-from threading import Lock
 
 from functools import cmp_to_key
 from collections import namedtuple
@@ -60,7 +59,7 @@ class RoundCogError(commands.CommandError):
 class Round(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.lock = Lock()
+        self.locked = False
 
     @commands.Cog.listener()
     @discord_common.once
@@ -87,18 +86,22 @@ class Round(commands.Cog):
         await self._update_all_ongoing_rounds(guild, channel, True)
 
     async def _update_all_ongoing_rounds(self, guild, channel, isAutomaticRun):
-        self.lock.acquire()
-        rounds = cf_common.user_db.get_ongoing_rounds(guild.id)
-        try:
-            for round in rounds:
-                await self._check_round_complete(guild, channel, round, isAutomaticRun)
-        except Exception as exception:
-            msg = 'Ignoring exception in command {}:'.format("_check_round_complete")
-            exc_info = type(exception), exception, exception.__traceback__
-            extra = { }
-            logger.exception(msg, exc_info=exc_info, extra=extra)
-        self.lock.release()
-
+        if not self.locked:
+            self.locked = True
+            rounds = cf_common.user_db.get_ongoing_rounds(guild.id)
+            try:
+                for round in rounds:
+                    await self._check_round_complete(guild, channel, round, isAutomaticRun)
+            except Exception as exception:
+                if isAutomaticRun:
+                    msg = 'Ignoring exception in command {}:'.format("_check_round_complete")
+                    exc_info = type(exception), exception, exception.__traceback__
+                    extra = { }
+                    logger.exception(msg, exc_info=exc_info, extra=extra)
+                else:
+                    self.locked = False
+                    raise exception
+            self.locked = False
 
     def _check_if_correct_channel(self, ctx):
         lockout_channel_id = cf_common.user_db.get_round_channel(ctx.guild.id)
