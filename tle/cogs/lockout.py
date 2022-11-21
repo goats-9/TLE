@@ -1,8 +1,10 @@
+
 import random
 import discord
 import asyncio
 import time
 import logging
+from threading import Lock
 
 from functools import cmp_to_key
 from collections import namedtuple
@@ -58,8 +60,7 @@ class RoundCogError(commands.CommandError):
 class Round(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # self.cf = cf_api.CodeforcesAPI()
-        # self.api = challonge_api.ChallongeAPI(self.bot)
+        self.lock = Lock()
 
     @commands.Cog.listener()
     @discord_common.once
@@ -83,9 +84,14 @@ class Round(commands.Cog):
             logger.warn(f'_check_ongoing_rounds_for_guild: lockout round channel is not found on the server.')
             return
 
+        self._update_all_ongoing_rounds(guild, channel, True)
+
+    async def _update_all_ongoing_rounds(self, guild, channel, isAutomaticRun):
+        self.lock.acquire()
         rounds = cf_common.user_db.get_ongoing_rounds(guild.id)
         for round in rounds:
-            await self._check_round_complete(guild, channel, round, True)         
+            await self._check_round_complete(guild, channel, round, isAutomaticRun)
+        self.lock.release()
 
     def _check_if_correct_channel(self, ctx):
         lockout_channel_id = cf_common.user_db.get_round_channel(ctx.guild.id)
@@ -361,6 +367,21 @@ class Round(commands.Cog):
             return False
         return True
 
+    async def _round_end_embed(self, channel, round_info, ranklist, eloChanges):
+        embed = discord.Embed(color=discord.Color.dark_magenta())
+        pos, name, ratingChange = '', '', ''
+        for user in ranklist:
+            handle = cf_common.user_db.get_handle(user.id, round_info.guild)
+            emojis = [":first_place:", ":second_place:", ":third_place:"]
+            pos += f"{emojis[user.rank-1] if user.rank <= len(emojis) else str(user.rank)} **{user.points}**\n"
+            name += f"[{handle}](https://codeforces.com/profile/{handle})\n"
+            ratingChange += f"{eloChanges[user.id][0]} (**{'+' if eloChanges[user.id][1] >= 0 else ''}{eloChanges[user.id][1]}**)\n"
+        embed.add_field(name="Position", value=pos)
+        embed.add_field(name="User", value=name)
+        embed.add_field(name="Rating changes", value=ratingChange)
+        embed.set_author(name=f"Round over! Final standings")
+
+        await channel.send(embed=embed)    
 
     async def _update_round(self, round_info):
         user_ids = list(map(int, round_info.users.split()))
@@ -421,23 +442,6 @@ class Round(commands.Cog):
             over = True
         return updates, over, updated
 
-    async def _round_end_embed(self, channel, round_info, ranklist, eloChanges):
-        ### extract into function
-        embed = discord.Embed(color=discord.Color.dark_magenta())
-        pos, name, ratingChange = '', '', ''
-        for user in ranklist:
-            handle = cf_common.user_db.get_handle(user.id, round_info.guild)
-            emojis = [":first_place:", ":second_place:", ":third_place:"]
-            pos += f"{emojis[user.rank-1] if user.rank <= len(emojis) else str(user.rank)} **{user.points}**\n"
-            name += f"[{handle}](https://codeforces.com/profile/{handle})\n"
-            ratingChange += f"{eloChanges[user.id][0]} (**{'+' if eloChanges[user.id][1] >= 0 else ''}{eloChanges[user.id][1]}**)\n"
-        embed.add_field(name="Position", value=pos)
-        embed.add_field(name="User", value=name)
-        embed.add_field(name="Rating changes", value=ratingChange)
-        embed.set_author(name=f"Round over! Final standings")
-
-        await channel.send(embed=embed)           
-
     async def _check_round_complete(self, guild, channel, round, isAutomaticRun = False):
         updates, over, updated = await self._update_round(round)
 
@@ -473,6 +477,7 @@ class Round(commands.Cog):
             await self._round_end_embed(channel, round_info, ranklist, eloChanges)
 
 
+
     @round.command(brief="Update matches status for the server")
     @cooldown(1, AUTO_UPDATE_TIME, BucketType.guild)
     async def update(self, ctx):
@@ -480,9 +485,10 @@ class Round(commands.Cog):
         self._check_if_correct_channel(ctx)
 
         await ctx.send(embed=discord.Embed(description="Updating rounds for this server", color=discord.Color.green()))
-        rounds = cf_common.user_db.get_ongoing_rounds(ctx.guild.id)
-        for round in rounds:
-            await self._check_round_complete(ctx.guild, ctx.channel, round, False)
+
+        self._update_all_ongoing_rounds(ctx.guild, ctx.channel, False)
+
+        
 
     # @round.command(name="ongoing", brief="View ongoing rounds")
     # async def ongoing(self, ctx):
