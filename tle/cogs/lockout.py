@@ -89,9 +89,14 @@ class Round(commands.Cog):
     async def _update_all_ongoing_rounds(self, guild, channel, isAutomaticRun):
         self.lock.acquire()
         rounds = cf_common.user_db.get_ongoing_rounds(guild.id)
-        for round in rounds:
-            await self._check_round_complete(guild, channel, round, isAutomaticRun)
+        try:
+            for round in rounds:
+                await self._check_round_complete(guild, channel, round, isAutomaticRun)
+        except Exception as e:
+            self.lock.release()
+            raise e
         self.lock.release()
+
 
     def _check_if_correct_channel(self, ctx):
         lockout_channel_id = cf_common.user_db.get_round_channel(ctx.guild.id)
@@ -443,6 +448,7 @@ class Round(commands.Cog):
         return updates, over, updated
 
     async def _check_round_complete(self, guild, channel, round, isAutomaticRun = False):
+        raise RoundCogError("TestError")
         updates, over, updated = await self._update_round(round)
 
         if updated or over:
