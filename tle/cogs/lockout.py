@@ -450,7 +450,6 @@ class Round(commands.Cog):
         return updates, over, updated
 
     async def _check_round_complete(self, guild, channel, round, isAutomaticRun = False):
-        raise RoundCogError("TestError")
         updates, over, updated = await self._update_round(round)
 
         if updated or over:
