@@ -93,7 +93,6 @@ class Round(commands.Cog):
             for round in rounds:
                 await self._check_round_complete(guild, channel, round, isAutomaticRun)
         except Exception as exception:
-            self.lock.release()
             msg = 'Ignoring exception in command {}:'.format("_check_round_complete")
             exc_info = type(exception), exception, exception.__traceback__
             extra = { }
