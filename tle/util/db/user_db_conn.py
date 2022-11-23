@@ -1280,15 +1280,28 @@ class UserDbConn:
         cur.close()    
 
     def get_ongoing_rounds(self, guild):
-        query = f"""
+        query = f'''
                     SELECT * FROM lockout_ongoing_rounds WHERE guild = ?
-                """
+                '''
         cur = self.conn.cursor()
         cur.execute(query, (guild,))
         res = cur.fetchall()
         cur.close()
         Round = namedtuple('Round', 'guild users rating points time problems status duration repeat times')
         return [Round(data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10]) for data in res]
+
+    def get_recent_rounds(self, guild, user=None):
+        query = f'''
+                    SELECT * FROM lockout_finished_rounds 
+                    WHERE guild = ? AND users LIKE ?
+                    ORDER BY end_time DESC
+                '''
+        cur = self.conn.cursor()
+        cur.execute(query, (guild, '%' if user is None else f'%{user}%'))
+        res = cur.fetchall()
+        cur.close()
+        Round = namedtuple('Round', 'guild users rating points time problems status duration repeat times end_time')
+        return [Round(data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11]) for data in res]
 
     def close(self):
         self.conn.close()

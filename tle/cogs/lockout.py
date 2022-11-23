@@ -532,101 +532,37 @@ class Round(commands.Cog):
         paginator.paginate(self.bot, ctx.channel, pages, wait_time=_PAGINATE_WAIT_TIME,
                            set_pagenum_footers=True)
 
-        # currPage = 0
-        # totPage = math.ceil(len(content) / ROUNDS_PER_PAGE)
-        # text = '\n'.join(content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-        # embed = discord.Embed(description=text, color=discord.Color.blurple())
-        # embed.set_author(name="Ongoing Rounds")
-        # embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
-        # message = await ctx.send(embed=embed)
+    @round.command(name="recent", brief="Show recent rounds")
+    async def recent(self, ctx, user: discord.Member=None):
+        data = cf_common.user_db.get_recent_rounds(ctx.guild.id, str(user.id) if user else None)
+        
+        if not data:
+            raise RoundCogError(f"No recent rounds")
 
-        # await message.add_reaction("⏮")
-        # await message.add_reaction("◀")
-        # await message.add_reaction("▶")
-        # await message.add_reaction("⏭")
+        def _make_pages(data, title):
+            chunks = paginator.chunkify(data, ROUNDS_PER_PAGE)
+            pages = []
 
-        # def check(reaction, user):
-        #     return reaction.message.id == message.id and reaction.emoji in ["⏮", "◀", "▶",
-        #                                                                     "⏭"] and user != self.bot.user
+            for chunk in chunks:
+                for round in chunk:
+                    ranklist = _calc_round_score(list(map(int, round.users.split())), list(map(int, round.status.split())),
+                                                    list(map(int, round.times.split())))
+                    msg = ' vs '.join([f"[{cf_common.user_db.get_handle(user.id, round.guild) }](https://codeforces.com/profile/{cf_common.user_db.get_handle(user.id, round.guild) }) `Rank {user.rank}` `{user.points} Points`"
+                                    for user in ranklist])
+                    msg += f"\n**Problem ratings:** {round.rating}"
+                    msg += f"\n**Score distribution** {round.points}"
+                    timestr = cf_common.pretty_time_format(min(60*round.duration, round.end_time-round.time), shorten=True, always_seconds=True)
+                    msg += f"\n**Duration:** {timestr}\n\n"
+                embed = discord_common.cf_color_embed(description=msg)
+                pages.append((title, embed))
 
-        # while True:
-        #     try:
-        #         reaction, user = await self.bot.wait_for('reaction_add', timeout=90, check=check)
-        #         try:
-        #             await reaction.remove(user)
-        #         except Exception:
-        #             pass
-        #         if reaction.emoji == "⏮":
-        #             currPage = 0
-        #         elif reaction.emoji == "◀":
-        #             currPage = max(currPage - 1, 0)
-        #         elif reaction.emoji == "▶":
-        #             currPage = min(currPage + 1, totPage - 1)
-        #         else:
-        #             currPage = totPage - 1
-        #         text = '\n'.join(
-        #             content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-        #         embed = discord.Embed(description=text, color=discord.Color.blurple())
-        #         embed.set_author(name="Ongoing rounds")
-        #         embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
-        #         await message.edit(embed=embed)
+            return pages
 
-        #     except asyncio.TimeoutError:
-        #         break
+        title = 'List of ongoing lockout rounds'
+        pages = _make_pages(data, title)
+        paginator.paginate(self.bot, ctx.channel, pages, wait_time=_PAGINATE_WAIT_TIME,
+                           set_pagenum_footers=True)
 
-
-
-#     @round.command(name="recent", brief="Show recent rounds")
-#     async def recent(self, ctx, user: discord.Member=None):
-#         data = self.db.get_recent_rounds(ctx.guild.id, str(user.id) if user else None)
-
-#         content = discord_.recent_rounds_embed(data)
-
-#         if len(content) == 0:
-#             await discord_.send_message(ctx, f"No recent rounds")
-#             return
-
-#         currPage = 0
-#         totPage = math.ceil(len(content) / ROUNDS_PER_PAGE)
-#         text = '\n'.join(content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-#         embed = discord.Embed(description=text, color=discord.Color.blurple())
-#         embed.set_author(name="Recent Rounds")
-#         embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
-#         message = await ctx.send(embed=embed)
-
-#         await message.add_reaction("⏮")
-#         await message.add_reaction("◀")
-#         await message.add_reaction("▶")
-#         await message.add_reaction("⏭")
-
-#         def check(reaction, user):
-#             return reaction.message.id == message.id and reaction.emoji in ["⏮", "◀", "▶",
-#                                                                             "⏭"] and user != self.bot.user
-
-#         while True:
-#             try:
-#                 reaction, user = await self.bot.wait_for('reaction_add', timeout=90, check=check)
-#                 try:
-#                     await reaction.remove(user)
-#                 except Exception:
-#                     pass
-#                 if reaction.emoji == "⏮":
-#                     currPage = 0
-#                 elif reaction.emoji == "◀":
-#                     currPage = max(currPage - 1, 0)
-#                 elif reaction.emoji == "▶":
-#                     currPage = min(currPage + 1, totPage - 1)
-#                 else:
-#                     currPage = totPage - 1
-#                 text = '\n'.join(
-#                     content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-#                 embed = discord.Embed(description=text, color=discord.Color.blurple())
-#                 embed.set_author(name="Recent rounds")
-#                 embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
-#                 await message.edit(embed=embed)
-
-#             except asyncio.TimeoutError:
-#                 break
 
 # #     @round.command(name="invalidate", brief="Invalidate your round")
 # #     async def invalidate(self, ctx):
