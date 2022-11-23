@@ -1,5 +1,6 @@
 
 import random
+from tkinter import ROUND
 import discord
 import asyncio
 import time
@@ -94,11 +95,13 @@ class Round(commands.Cog):
                     await self._check_round_complete(guild, channel, round, isAutomaticRun)
             except Exception as exception:
                 if isAutomaticRun:
+                    # in automatic run we need to handle exceptions on our own -> put them into server log for now (TODO: logging channel would be better)
                     msg = 'Ignoring exception in command {}:'.format("_check_round_complete")
                     exc_info = type(exception), exception, exception.__traceback__
                     extra = { }
                     logger.exception(msg, exc_info=exc_info, extra=extra)
                 else:
+                    # Exceptions will be handled through other mechanisms but we make sure that the locked variable is reset
                     self.locked = False
                     raise exception
             self.locked = False
@@ -235,7 +238,7 @@ class Round(commands.Cog):
     async def round(self, ctx):
         await ctx.send(embed=self.make_round_embed(ctx))
 
-    @round.command(brief='Set the lockout channel to the current channel')
+    @round.command(brief='Set the lockout channel to the current channel (Admin/Mod only)')
     @commands.has_any_role(constants.TLE_ADMIN, constants.TLE_MODERATOR)  # OK
     async def set_channel(self, ctx):
         """ Sets the lockout round channel to the current channel.
@@ -289,6 +292,8 @@ class Round(commands.Cog):
             if not cf_common.user_db.is_duelist(member.id, ctx.guild.id):
                 raise RoundCogError(
                     f'{member.mention}, you are not a registered duelist!')            
+        # check for members still in a round
+        self._check_if_any_member_is_already_in_round(ctx, members)
 
         await self._check_if_all_members_ready(ctx, members)           
 
@@ -301,9 +306,6 @@ class Round(commands.Cog):
         points = await self._get_seq_response(self.bot, ctx, f"{ctx.author.mention} enter {problem_cnt} space seperated integer denoting the points of problems (between 100 and 10,000)", 60, problem_cnt, ctx.author, [100, 10000])
 
         repeat = await self._get_time_response(self.bot, ctx, f"{ctx.author.mention} do you want a new problem to appear when someone solves a problem (type 1 for yes and 0 for no)", 30, ctx.author, [0, 1])
-
-        # check for members still in a round
-        self._check_if_any_member_is_already_in_round(ctx, members)
 
         # pick problems
         handles = cf_common.members_to_handles(members, ctx.guild.id)
@@ -321,7 +323,7 @@ class Round(commands.Cog):
 
         await ctx.send(embed=self._round_problems_embed(round_info))
 
-    @round.command(brief="Invalidate a round (Admin/Mod/Lockout Manager only)")
+    @round.command(brief="Invalidate a round (Admin/Mod only)")
     @commands.has_any_role(constants.TLE_ADMIN, constants.TLE_MODERATOR)  # OK
     async def _invalidate(self, ctx, member: discord.Member):
         if not cf_common.user_db.check_if_user_in_ongoing_round(ctx.guild.id, member.id):
@@ -500,60 +502,78 @@ class Round(commands.Cog):
 
         
 
-    # @round.command(name="ongoing", brief="View ongoing rounds")
-    # async def ongoing(self, ctx):
-    #     data = cf_common.user_db.get_ongoing_rounds(ctx.guild.id)
+    @round.command(name="ongoing", brief="View ongoing rounds")
+    async def ongoing(self, ctx):
+        data = cf_common.user_db.get_ongoing_rounds(ctx.guild.id)
 
-    #     if not data:
-    #         raise RoundCogError(f"No ongoing rounds")
+        if not data:
+            raise RoundCogError(f"No ongoing rounds")
 
-    #     content = discord_.ongoing_rounds_embed(data)
+        def _make_pages(data, title):
+            chunks = paginator.chunkify(data, ROUNDS_PER_PAGE)
+            pages = []
 
-    #     pages = _make_pages(users, title)
-    #     paginator.paginate(self.bot, ctx.channel, pages, wait_time=_PAGINATE_WAIT_TIME,
-    #                        set_pagenum_footers=True)
+            for chunk in chunks:
+                for round in chunk:
+                    ranklist = self._round_score(list(map(int, round.users.split())), list(map(int, round.status.split())),
+                                                    list(map(int, round.times.split())))
+                    msg = ' vs '.join([f"[{cf_common.user_db.get_handle(user.id, round.guild) }](https://codeforces.com/profile/{cf_common.user_db.get_handle(user.id, round.guild) }) `Rank {user.rank}` `{user.points} Points`"
+                                    for user in ranklist])
+                    msg += f"\n**Problem ratings:** {round.rating}"
+                    msg += f"\n**Score distribution** {round.points}"
+                    timestr = cf_common.pretty_time_format(((round.time + 60 * round.duration) - int(time.time())), shorten=True, always_seconds=True)
+                    msg += f"\n**Time left:** {timestr}\n\n"
+                embed = discord_common.cf_color_embed(description=msg)
+                pages.append((title, embed))
 
-    #     currPage = 0
-    #     totPage = math.ceil(len(content) / ROUNDS_PER_PAGE)
-    #     text = '\n'.join(content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-    #     embed = discord.Embed(description=text, color=discord.Color.blurple())
-    #     embed.set_author(name="Ongoing Rounds")
-    #     embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
-    #     message = await ctx.send(embed=embed)
+            return pages
 
-    #     await message.add_reaction("⏮")
-    #     await message.add_reaction("◀")
-    #     await message.add_reaction("▶")
-    #     await message.add_reaction("⏭")
+        title = 'List of ongoing lockout rounds'
+        pages = _make_pages(data, title)
+        paginator.paginate(self.bot, ctx.channel, pages, wait_time=_PAGINATE_WAIT_TIME,
+                           set_pagenum_footers=True)
 
-    #     def check(reaction, user):
-    #         return reaction.message.id == message.id and reaction.emoji in ["⏮", "◀", "▶",
-    #                                                                         "⏭"] and user != self.bot.user
+        # currPage = 0
+        # totPage = math.ceil(len(content) / ROUNDS_PER_PAGE)
+        # text = '\n'.join(content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
+        # embed = discord.Embed(description=text, color=discord.Color.blurple())
+        # embed.set_author(name="Ongoing Rounds")
+        # embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
+        # message = await ctx.send(embed=embed)
 
-    #     while True:
-    #         try:
-    #             reaction, user = await self.bot.wait_for('reaction_add', timeout=90, check=check)
-    #             try:
-    #                 await reaction.remove(user)
-    #             except Exception:
-    #                 pass
-    #             if reaction.emoji == "⏮":
-    #                 currPage = 0
-    #             elif reaction.emoji == "◀":
-    #                 currPage = max(currPage - 1, 0)
-    #             elif reaction.emoji == "▶":
-    #                 currPage = min(currPage + 1, totPage - 1)
-    #             else:
-    #                 currPage = totPage - 1
-    #             text = '\n'.join(
-    #                 content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-    #             embed = discord.Embed(description=text, color=discord.Color.blurple())
-    #             embed.set_author(name="Ongoing rounds")
-    #             embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
-    #             await message.edit(embed=embed)
+        # await message.add_reaction("⏮")
+        # await message.add_reaction("◀")
+        # await message.add_reaction("▶")
+        # await message.add_reaction("⏭")
 
-    #         except asyncio.TimeoutError:
-    #             break
+        # def check(reaction, user):
+        #     return reaction.message.id == message.id and reaction.emoji in ["⏮", "◀", "▶",
+        #                                                                     "⏭"] and user != self.bot.user
+
+        # while True:
+        #     try:
+        #         reaction, user = await self.bot.wait_for('reaction_add', timeout=90, check=check)
+        #         try:
+        #             await reaction.remove(user)
+        #         except Exception:
+        #             pass
+        #         if reaction.emoji == "⏮":
+        #             currPage = 0
+        #         elif reaction.emoji == "◀":
+        #             currPage = max(currPage - 1, 0)
+        #         elif reaction.emoji == "▶":
+        #             currPage = min(currPage + 1, totPage - 1)
+        #         else:
+        #             currPage = totPage - 1
+        #         text = '\n'.join(
+        #             content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
+        #         embed = discord.Embed(description=text, color=discord.Color.blurple())
+        #         embed.set_author(name="Ongoing rounds")
+        #         embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
+        #         await message.edit(embed=embed)
+
+        #     except asyncio.TimeoutError:
+        #         break
 
 
 
