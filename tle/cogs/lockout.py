@@ -514,7 +514,7 @@ class Round(commands.Cog):
 
             for chunk in chunks:
                 for round in chunk:
-                    ranklist = self._round_score(list(map(int, round.users.split())), list(map(int, round.status.split())),
+                    ranklist = _calc_round_score(list(map(int, round.users.split())), list(map(int, round.status.split())),
                                                     list(map(int, round.times.split())))
                     msg = ' vs '.join([f"[{cf_common.user_db.get_handle(user.id, round.guild) }](https://codeforces.com/profile/{cf_common.user_db.get_handle(user.id, round.guild) }) `Rank {user.rank}` `{user.points} Points`"
                                     for user in ranklist])
