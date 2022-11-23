@@ -513,10 +513,11 @@ class Round(commands.Cog):
             pages = []
 
             for chunk in chunks:
+                msg = ''
                 for round in chunk:
                     ranklist = _calc_round_score(list(map(int, round.users.split())), list(map(int, round.status.split())),
                                                     list(map(int, round.times.split())))
-                    msg = ' vs '.join([f"[{cf_common.user_db.get_handle(user.id, round.guild) }](https://codeforces.com/profile/{cf_common.user_db.get_handle(user.id, round.guild) }) `Rank {user.rank}` `{user.points} Points`"
+                    msg += ' vs '.join([f"[{cf_common.user_db.get_handle(user.id, round.guild) }](https://codeforces.com/profile/{cf_common.user_db.get_handle(user.id, round.guild) }) `Rank {user.rank}` `{user.points} Points`"
                                     for user in ranklist])
                     msg += f"\n**Problem ratings:** {round.rating}"
                     msg += f"\n**Score distribution** {round.points}"
@@ -544,10 +545,11 @@ class Round(commands.Cog):
             pages = []
 
             for chunk in chunks:
+                msg = ''
                 for round in chunk:
                     ranklist = _calc_round_score(list(map(int, round.users.split())), list(map(int, round.status.split())),
                                                     list(map(int, round.times.split())))
-                    msg = ' vs '.join([f"[{cf_common.user_db.get_handle(user.id, round.guild) }](https://codeforces.com/profile/{cf_common.user_db.get_handle(user.id, round.guild) }) `Rank {user.rank}` `{user.points} Points`"
+                    msg += ' vs '.join([f"[{cf_common.user_db.get_handle(user.id, round.guild) }](https://codeforces.com/profile/{cf_common.user_db.get_handle(user.id, round.guild) }) `Rank {user.rank}` `{user.points} Points`"
                                     for user in ranklist])
                     msg += f"\n**Problem ratings:** {round.rating}"
                     msg += f"\n**Score distribution** {round.points}"
