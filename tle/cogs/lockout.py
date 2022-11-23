@@ -560,47 +560,10 @@ class Round(commands.Cog):
 
             return pages
 
-        title = 'List of ongoing lockout rounds'
+        title = 'List of recent lockout rounds'
         pages = _make_pages(data, title)
         paginator.paginate(self.bot, ctx.channel, pages, wait_time=_PAGINATE_WAIT_TIME,
                            set_pagenum_footers=True)
-
-
-# #     @round.command(name="invalidate", brief="Invalidate your round")
-# #     async def invalidate(self, ctx):
-# #         if not self.db.in_a_round(ctx.guild.id, ctx.author.id):
-# #             await ctx.send(f"{ctx.author.mention} you are not in a round")
-# #             return
-# #
-# #         data = self.db.get_round_info(ctx.guild.id, ctx.author.id)
-# #         try:
-# #             users = [await ctx.guild.fetch_member(int(x)) for x in data[1].split()]
-# #         except Exception:
-# #             await ctx.send(f"{ctx.author.mention} some error occurred! Maybe one of the participants left the server")
-# #             return
-# #
-# #         msg = await ctx.send(f"{' '.join([x.mention for x in users])} react within 30 seconds to invalidate the match")
-# #         await msg.add_reaction("✅")
-# #
-# #         await asyncio.sleep(30)
-# #         message = await ctx.channel.fetch_message(msg.id)
-# #
-# #         reaction = None
-# #         for x in message.reactions:
-# #             if x.emoji == "✅":
-# #                 reaction = x
-# #
-# #         reacted = await reaction.users().flatten()
-# #         for i in users:
-# #             if i not in reacted:
-# #                 await ctx.send(f"Unable to invalidate round, {i.name} did not react in time!")
-# #                 return
-# #
-# #         self.db.delete_round(ctx.guild.id, ctx.author.id)
-# #         await ctx.send(f"Match has been invalidated")
-# #
-
-
 
 #     @round.command(name="custom", brief="Challenge to a round with custom problemset")
 #     async def custom(self, ctx, *users: discord.Member):
