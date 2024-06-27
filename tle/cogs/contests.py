@@ -837,57 +837,50 @@ class Contests(commands.Cog):
         await ctx.send(embed=embed, file=discord_file)
 
 
-    @commands.command(brief='Estimation of contest problem ratings', aliases=['probrat'], usage='contest_id')
-    async def problemratings(self, ctx, contest_id: int):
-        """Estimation of contest problem ratings
-        """
-        await ctx.send('This will take a while')
-        contests = await cf.contest.list()
-        reqcontest = [contest for contest in contests if contest.id == contest_id]
-        combined = [contest for contest in contests if reqcontest[0].startTimeSeconds == contest.startTimeSeconds]
-
-
-        # get ranklist of all contests in separate lists
-        # get rating_changes of all contests in separate lists
-        # for each problem name of original contest
-            # find in each ranklist the handles and ratings that had a chance to do the problem
-            # calculate rating from these values
-
+    async def _generateRatingCache(self, contests, contest_id):
         problems = []
         ranklists = []
-        rating_cache = dict()
-        for contest in combined:
-            _, problem, ranklist = await cf.contest.standings(contest_id=contest.id, show_unofficial=False)
+        for contest in contests:
+            _, problem, ranklist = await cf.contest.standings(contest_id=contest.id, show_unofficial=True)
+            #exclude virtual participants
+            ranklist = [row for row in ranklist if row.party.participantType != "VIRTUAL" and row.party.participantType != "MANAGER"]
+
             problems.append(problem)
             ranklists.append(ranklist)
 
             if contest.id == contest_id:
-                officialRatings = [prob.rating for prob in problem]
-                indicies = [prob.index for prob in problem]
-                problemNames = [prob.name for prob in problem]
+                index = len(problems) - 1
 
             #build ratingCache that has all old_rating for all contestants
-            try:
-                rating_change = await cf.contest.ratingChanges(contest_id=contest.id)
-            except cf.RatingChangesUnavailableError as e:
-                rating_change = []
-            from_cache = False
-            if len(rating_change) == 0:
-                # get rating of contestants from cache
-                # we want to have the rating before the contest we query for
-                from_cache = True
-                cached_ratings = await cf_common.cache2.rating_changes_cache.get_all_ratings_before_timestamp(reqcontest[0].startTimeSeconds)
-                for row in ranklist:
-                    member = row.party.members[0].handle
-                    # members not in cache are considered new (Unrated)
-                    if member in cached_ratings:
-                        rating_cache[member] = cached_ratings[member].newRating
-                    else:
-                        rating_cache[member] = 0
-            else:
-                for change in rating_change:
-                    rating_cache[change.handle] = change.oldRating
+            # try:
+            #     rating_change = await cf.contest.ratingChanges(contest_id=contest.id)
+            # except cf.RatingChangesUnavailableError as e:
+            #     rating_change = []
+            # from_cache = False
+            # if len(rating_change) == 0 or include_unofficial:
+            # else:
+            #     for change in rating_change:
+            #         rating_cache[change.handle] = change.oldRating
+            #        from_cache = True
 
+
+
+        # get rating of contestants from cache
+        # we want to have the rating before the contest we query for
+        rating_cache = dict()
+        cached_ratings = await cf_common.cache2.rating_changes_cache.get_all_ratings_before_timestamp(contest.startTimeSeconds)
+        for ranklist in ranklists:
+            for row in ranklist:
+                member = row.party.members[0].handle
+                # members not in cache are considered new (Unrated)
+                if member in cached_ratings:
+                    rating_cache[member] = cached_ratings[member].newRating
+                else:
+                    rating_cache[member] = 0
+
+        return rating_cache, ranklists, problems, index
+
+    async def _calculateProblemRatings(self, problems, ranklists, rating_cache, contest_name, index, include_unofficial):
         def calculateDifficulty(ratings, solved):
             ans = -1000
 
@@ -909,6 +902,9 @@ class Contests(commands.Cog):
             ans = round(ans+1)
             return ans
 
+
+        problemNames = [prob.name for prob in problems[index]]
+
         predicted = []
         for name in problemNames:
             ratings = []
@@ -922,19 +918,56 @@ class Contests(commands.Cog):
                         idx = j
                 if idx == -1: continue
                 for row in ranklists[i]:
-                    member = row.party.members[0].handle
-                    if member in rating_cache:
-                        solves.append(min(row.problemResults[idx].points, 1))
-                        ratings.append(rating_cache[member])
-            predicted.append(calculateDifficulty(ratings,solves))
+                    for member in row.party.members:
+                        handle = member.handle
+                        if not include_unofficial:
+                            if row.party.participationType != 'CONTESTANT':
+                                continue
+                            # Hack for edu contests
+                            if "Educational" in contest_name and handle in rating_cache and rating_cache[handle] >= 2100:
+                                continue
+                        if handle in rating_cache:
+                            solves.append(min(row.problemResults[idx].points, 1))
+                            ratings.append(rating_cache[handle])
+            predicted.append(calculateDifficulty(ratings,solves))        
+        return predicted
+
+    async def _calculatePrediction(self, contests, contest_id):
+        # get ranklist of all contests in separate lists
+        # get rating_changes of all contests in separate lists
+        # for each problem name of original contest
+            # find in each ranklist the handles and ratings that had a chance to do the problem
+            # calculate rating from these values
+
+        rating_cache, ranklists, problems, index = await self._generateRatingCache(contests, contest_id)
+
+        predicted           = self._calculateProblemRatings(problems, ranklists, rating_cache, contests[index].name, index, False)
+        predictedUnofficial = self._calculateProblemRatings(problems, ranklists, rating_cache, contests[index].name, index, True)
+
+        officialRatings = [prob.rating for prob in problems[index]]
+        indicies = [prob.index for prob in problems[index]]
+
+        return officialRatings, indicies, predicted, predictedUnofficial
+
+    @commands.command(brief='Estimation of contest problem ratings', aliases=['probrat'], usage='contest_id')
+    async def problemratings(self, ctx, contest_id: int, show_unofficial: bool = False):
+        """Estimation of contest problem ratings
+        """
+        await ctx.send('This will take a while')
+        contests = await cf.contest.list()
+        reqcontest = [contest for contest in contests if contest.id == contest_id]
+        combined = [contest for contest in contests if reqcontest[0].startTimeSeconds == contest.startTimeSeconds]
+
+
+        officialRatings, indicies, predictedRatings, predictedRatingsUnofficial = await self._calculatePrediction(combined, contest_id)
 
         # Output results
-        style = table.Style('{:<}  {:>}  {:>}')
+        style = table.Style('{:<}  {:>}  {:>} {:>}')
         t = table.Table(style)
-        t += table.Header('#', 'Official', 'Predicted (C)' if from_cache else 'Predicted')
+        t += table.Header('#', 'Official', 'Predicted (C)', 'Predicted (Unoff)')
         t += table.Line()
         for i, index in enumerate(indicies):
-            t += table.Data(f'{index}', f'{officialRatings[i]}', f'{predicted[i]}')
+            t += table.Data(f'{index}', f'{officialRatings[i]}', f'{predictedRatings[i]}', f'{predictedRatingsUnofficial[i]}')
         table_str = f'```\n{t}\n```'
         url = f'{cf.CONTEST_BASE_URL}{contest_id}'
         title = reqcontest[0].name
