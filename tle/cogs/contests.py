@@ -921,7 +921,7 @@ class Contests(commands.Cog):
                     for member in row.party.members:
                         handle = member.handle
                         if not include_unofficial:
-                            if row.party.participationType != 'CONTESTANT':
+                            if row.party.participantType != 'CONTESTANT':
                                 continue
                             # Hack for edu contests
                             if "Educational" in contest_name and handle in rating_cache and rating_cache[handle] >= 2100:
