@@ -959,7 +959,7 @@ class Contests(commands.Cog):
         combined = [contest for contest in contests if reqcontest[0].startTimeSeconds == contest.startTimeSeconds]
 
 
-        officialRatings, indicies, predictedRatings, predictedRatingsUnofficial = await self._calculatePrediction(combined, contest_id)
+        officialRatings, indicies, predictedRatings, predictedRatingsUnofficial = self._calculatePrediction(combined, contest_id)
 
         # Output results
         style = table.Style('{:<}  {:>}  {:>} {:>}')
