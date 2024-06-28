@@ -837,7 +837,7 @@ class Contests(commands.Cog):
         await ctx.send(embed=embed, file=discord_file)
 
 
-    async def _generateRatingCache(self, contests, contest_id):
+    async def _generateRatingCache(self, contests, contest_id, new_user_rating):
         problems = []
         ranklists = []
         for contest in contests:
@@ -878,7 +878,8 @@ class Contests(commands.Cog):
                 if member in cached_ratings:
                     rating_cache[member] = cached_ratings[member].newRating
                 else:
-                    rating_cache[member] = 1400
+                    if new_user_rating >= 0:
+                        rating_cache[member] = new_user_rating
 
         return rating_cache, ranklists, problems, index
 
@@ -934,7 +935,7 @@ class Contests(commands.Cog):
             predicted.append(calculateDifficulty(ratings,solves))        
         return predicted
 
-    async def _calculatePrediction(self, contests, contest_id):
+    async def _calculatePrediction(self, contests, contest_id, new_user_rating):
         # get ranklist of all contests in separate lists
         # get rating_changes of all contests in separate lists
         # for each problem name of original contest
@@ -943,8 +944,8 @@ class Contests(commands.Cog):
 
         rating_cache, ranklists, problems, index = await self._generateRatingCache(contests, contest_id)
 
-        predicted           = self._calculateProblemRatings(problems, ranklists, rating_cache, contests[index].name, index, False)
-        predictedUnofficial = self._calculateProblemRatings(problems, ranklists, rating_cache, contests[index].name, index, True)
+        predicted           = self._calculateProblemRatings(problems, ranklists, rating_cache, contests[index].name, index, False, new_user_rating)
+        predictedUnofficial = self._calculateProblemRatings(problems, ranklists, rating_cache, contests[index].name, index, True, new_user_rating)
 
         officialRatings = [prob.rating for prob in problems[index]]
         indicies = [prob.index for prob in problems[index]]
@@ -952,7 +953,7 @@ class Contests(commands.Cog):
         return officialRatings, indicies, predicted, predictedUnofficial
 
     @commands.command(brief='Estimation of contest problem ratings', aliases=['probrat'], usage='contest_id')
-    async def problemratings(self, ctx, contest_id: int, show_unofficial: bool = False):
+    async def problemratings(self, ctx, contest_id: int, new_user_rating: int = -1):
         """Estimation of contest problem ratings
         """
         await ctx.send('This will take a while')
@@ -961,7 +962,7 @@ class Contests(commands.Cog):
         combined = [contest for contest in contests if reqcontest[0].startTimeSeconds == contest.startTimeSeconds]
 
 
-        officialRatings, indicies, predictedRatings, predictedRatingsUnofficial = await self._calculatePrediction(combined, contest_id)
+        officialRatings, indicies, predictedRatings, predictedRatingsUnofficial = await self._calculatePrediction(combined, contest_id, new_user_rating)
 
         # Output results
         style = table.Style('{:<}  {:>}  {:>} {:>}')
