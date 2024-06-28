@@ -844,7 +844,7 @@ class Contests(commands.Cog):
             _, problem, ranklist = await cf.contest.standings(contest_id=contest.id, show_unofficial=True)
             #exclude virtual participants
             self.logger.info(f'Fetched {len(ranklist)} participants on the ranklist of contest {contest.id}' )
-            ranklist = [row for row in ranklist if row.party.participantType != "VIRTUAL" and row.party.participantType != "MANAGER"]
+            ranklist = [row for row in ranklist if row.party.participantType != "VIRTUAL" and row.party.participantType != "MANAGER" and row.party.participantType != "PRACTICE"]
             self.logger.info(f'Fetched {len(ranklist)} participants on the ranklist of contest {contest.id} after cleanup')
 
             problems.append(problem)
