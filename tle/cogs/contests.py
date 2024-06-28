@@ -877,8 +877,8 @@ class Contests(commands.Cog):
                 # members not in cache are considered new (Unrated)
                 if member in cached_ratings:
                     rating_cache[member] = cached_ratings[member].newRating
-                # else:
-                #     rating_cache[member] = 0
+                else:
+                    rating_cache[member] = 1400
 
         return rating_cache, ranklists, problems, index
 
