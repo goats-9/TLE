@@ -942,10 +942,10 @@ class Contests(commands.Cog):
             # find in each ranklist the handles and ratings that had a chance to do the problem
             # calculate rating from these values
 
-        rating_cache, ranklists, problems, index = await self._generateRatingCache(contests, contest_id)
+        rating_cache, ranklists, problems, index = await self._generateRatingCache(contests, contest_id, new_user_rating)
 
-        predicted           = self._calculateProblemRatings(problems, ranklists, rating_cache, contests[index].name, index, False, new_user_rating)
-        predictedUnofficial = self._calculateProblemRatings(problems, ranklists, rating_cache, contests[index].name, index, True, new_user_rating)
+        predicted           = self._calculateProblemRatings(problems, ranklists, rating_cache, contests[index].name, index, False)
+        predictedUnofficial = self._calculateProblemRatings(problems, ranklists, rating_cache, contests[index].name, index, True)
 
         officialRatings = [prob.rating for prob in problems[index]]
         indicies = [prob.index for prob in problems[index]]
