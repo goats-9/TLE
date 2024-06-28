@@ -880,7 +880,7 @@ class Contests(commands.Cog):
 
         return rating_cache, ranklists, problems, index
 
-    async def _calculateProblemRatings(self, problems, ranklists, rating_cache, contest_name, index, include_unofficial):
+    def _calculateProblemRatings(self, problems, ranklists, rating_cache, contest_name, index, include_unofficial):
         def calculateDifficulty(ratings, solved):
             ans = -1000
 
@@ -959,7 +959,7 @@ class Contests(commands.Cog):
         combined = [contest for contest in contests if reqcontest[0].startTimeSeconds == contest.startTimeSeconds]
 
 
-        officialRatings, indicies, predictedRatings, predictedRatingsUnofficial = self._calculatePrediction(combined, contest_id)
+        officialRatings, indicies, predictedRatings, predictedRatingsUnofficial = await self._calculatePrediction(combined, contest_id)
 
         # Output results
         style = table.Style('{:<}  {:>}  {:>} {:>}')
