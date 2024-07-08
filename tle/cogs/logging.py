@@ -74,7 +74,7 @@ async def setup(bot):
         return
 
     logging_cog = Logging(bot, int(logging_cog_channel_id))
-    logging_cog.setLevel(logging.WARNING)
+    logging_cog.setLevel(logging.ERROR)
     logging_cog.setFormatter(logging.Formatter(fmt='{asctime}:{levelname}:{name}:{message}',
                                                style='{', datefmt='%d-%m-%Y %H:%M:%S'))
     root_logger.addHandler(logging_cog)

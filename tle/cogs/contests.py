@@ -5,6 +5,7 @@ import logging
 import time
 import datetime as dt
 from collections import defaultdict, namedtuple
+from typing import List
 
 import discord
 from discord.ext import commands
@@ -37,8 +38,9 @@ class ContestCogError(commands.CommandError):
 
 
 def _contest_start_time_format(contest, tz):
-    start = dt.datetime.fromtimestamp(contest.startTimeSeconds, tz)
-    return f'{start.strftime("%d %b %y, %H:%M")} {tz}'
+    start = dt.datetime.fromtimestamp(contest.startTimeSeconds, tz=tz)
+    start = dt.datetime.astimezone(start, tz=tz)
+    return f'{start.strftime("%d %b %y, %H:%M")} {start.tzname()}'
 
 
 def _contest_duration_format(contest):
@@ -60,7 +62,8 @@ def _get_formatted_contest_desc(id_str, start, duration, url, max_duration_len):
 
 
 def _get_embed_fields_from_contests(contests):
-    infos = [(contest.name, str(contest.id), _contest_start_time_format(contest, dt.timezone.utc),
+    # Use None for timezone to default to local timezone
+    infos = [(contest.name, str(contest.id), _contest_start_time_format(contest, None),
               _contest_duration_format(contest), contest.register_url)
              for contest in contests]
 
@@ -490,7 +493,7 @@ class Contests(commands.Cog):
         await ctx.channel.send(embed=self._make_contest_embed_for_ranklist(ranklist))
         await self._show_ranklist(channel=ctx.channel, contest_id=contest_id, handles=handles, ranklist=ranklist)
 
-    async def _show_ranklist(self, channel, contest_id: int, handles: list[str], ranklist, vc: bool = False, delete_after: float = None):
+    async def _show_ranklist(self, channel, contest_id: int, handles: List[str], ranklist, vc: bool = False, delete_after: float = None):
         contest = cf_common.cache2.contest_cache.get_contest(contest_id)
         if ranklist is None:
             raise ContestCogError('No ranklist to show')
