@@ -27,7 +27,7 @@ The features of the bot are split into a number of cogs, each handling their own
 Clone the repository
 
 ```bash
-git clone https://github.com/Denjell/TLE
+git clone https://github.com/goats-9/TLE
 ```
 
 ### Dependencies
