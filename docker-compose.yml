@@ -1,5 +1,6 @@
 services:
-  bot:
+  tle:
+    container_name: tle
     build:
       context: .
       dockerfile: Dockerfile
